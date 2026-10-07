@@ -1,0 +1,14 @@
+{
+  "eventId": "51fe9fdd-c3d9-3ed9-86ba-2218d0d959cb",
+  "eventType": "FILING_SUBMITTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-07T12:00:00Z",
+  "correlationId": "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20",
+  "payload": {
+    "filingId": "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12",
+    "companyName": "Acme Holdings Inc.",
+    "title": "Form 10-K for fiscal year 2025",
+    "content": "Item 1A. Risk Factors. We are subject to pending litigation relating to alleged patent infringement, and an adverse outcome could require us to pay substantial damages. In the prior fiscal year we experienced a cybersecurity incident that exposed limited customer data. Management identified a material weakness in our internal control over financial reporting.",
+    "submittedAt": "2026-10-07T12:00:00Z"
+  }
+}

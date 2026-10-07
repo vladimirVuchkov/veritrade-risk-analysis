@@ -1,0 +1,286 @@
+openapi: 3.1.0
+info:
+  title: VeriTrade Risk Analysis - external REST API
+  version: 1.0.0
+  description: |
+    External API used by the web UI. Requests reach the services through the nginx reverse proxy
+    on port 8080, so the UI calls same-origin paths (/api/filings, /api/reports).
+    Errors use RFC 9457 Problem Details (application/problem+json).
+    An optional X-Correlation-Id request header is propagated through all events; when absent,
+    Ingestion generates one and returns it in the response header.
+servers:
+  - url: http://localhost:8080
+    description: Through the nginx reverse proxy
+tags:
+  - name: Ingestion
+    description: Served by ingestion-service (port 8081 inside the Compose network)
+  - name: Reporting
+    description: Served by reporting-service (port 8083 inside the Compose network)
+paths:
+  /api/filings:
+    post:
+      tags: [Ingestion]
+      operationId: submitFiling
+      summary: Submit a filing for asynchronous risk analysis
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitFilingRequest'
+      responses:
+        '202':
+          description: Accepted; analysis runs asynchronously
+          headers:
+            Location:
+              description: URL of the filing status resource
+              schema:
+                type: string
+                example: /api/filings/3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitFilingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    get:
+      tags: [Ingestion]
+      operationId: listFilings
+      summary: List the most recent filings, newest first
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Filings, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FilingStatusResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/filings/{filingId}:
+    get:
+      tags: [Ingestion]
+      operationId: getFiling
+      summary: Get the status of a filing
+      parameters:
+        - $ref: '#/components/parameters/FilingId'
+      responses:
+        '200':
+          description: Filing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilingStatusResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/reports/{filingId}:
+    get:
+      tags: [Reporting]
+      operationId: getReport
+      summary: Get the risk report of a filing
+      description: |
+        Returns 404 until Reporting has consumed the terminal analysis event. Reporting is
+        eventually consistent with Ingestion, so a client that sees status COMPLETED or FAILED
+        keeps polling this resource until it returns 200.
+      parameters:
+        - $ref: '#/components/parameters/FilingId'
+      responses:
+        '200':
+          description: Report (status COMPLETED with findings, or FAILED with a reason)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    FilingId:
+      name: filingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+  headers:
+    CorrelationId:
+      description: Correlation id of the request (received or generated)
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid input (missing fields, empty content, content over 2 MB, invalid limit)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    NotFound:
+      description: Resource not found (or, for reports, not ready yet)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+  schemas:
+    SubmitFilingRequest:
+      type: object
+      required: [companyName, title, content]
+      properties:
+        companyName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Acme Holdings Inc.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: Form 10-K for fiscal year 2025
+        content:
+          type: string
+          minLength: 1
+          description: Filing text; at most 2 MB (2,097,152 bytes) of UTF-8. Blank text is rejected.
+    SubmitFilingResponse:
+      type: object
+      required: [filingId, status]
+      properties:
+        filingId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/FilingStatus'
+    FilingStatus:
+      type: string
+      enum: [SUBMITTED, ANALYZING, COMPLETED, FAILED]
+      description: SUBMITTED -> ANALYZING -> COMPLETED | FAILED. COMPLETED and FAILED are final.
+    FilingStatusResponse:
+      type: object
+      required: [filingId, companyName, title, status, submittedAt]
+      properties:
+        filingId:
+          type: string
+          format: uuid
+        companyName:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/FilingStatus'
+        submittedAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: [string, 'null']
+          description: Present only when status is FAILED
+    ReportStatus:
+      type: string
+      enum: [COMPLETED, FAILED]
+    RiskCategory:
+      type: string
+      enum: [FINANCIAL, LEGAL, OPERATIONAL, CYBERSECURITY, REGULATORY, MARKET]
+    Severity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    RiskLevel:
+      type: string
+      enum: [NONE, LOW, MEDIUM, HIGH, CRITICAL]
+    ReportResponse:
+      type: object
+      required: [filingId, status, generatedAt, findings]
+      properties:
+        filingId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        generatedAt:
+          type: string
+          format: date-time
+        rulesVersion:
+          type: [string, 'null']
+        failureReason:
+          type: [string, 'null']
+          description: Present only when status is FAILED
+        summary:
+          oneOf:
+            - $ref: '#/components/schemas/ReportSummaryResponse'
+            - type: 'null'
+          description: Absent (null) when status is FAILED
+        findings:
+          type: array
+          description: Ordered by severity (highest first), then by position. Empty when status is FAILED.
+          items:
+            $ref: '#/components/schemas/FindingResponse'
+    ReportSummaryResponse:
+      type: object
+      required: [totalFindings, overallRiskLevel, byCategory, bySeverity]
+      properties:
+        totalFindings:
+          type: integer
+          minimum: 0
+        overallRiskLevel:
+          $ref: '#/components/schemas/RiskLevel'
+        byCategory:
+          type: object
+          description: Findings per category; categories without findings are omitted
+          additionalProperties:
+            type: integer
+        bySeverity:
+          type: object
+          description: Findings per severity; severities without findings are omitted
+          additionalProperties:
+            type: integer
+    FindingResponse:
+      type: object
+      required: [category, severity, ruleId, matchedText, excerpt, position]
+      properties:
+        category:
+          $ref: '#/components/schemas/RiskCategory'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        ruleId:
+          type: string
+          example: LEGAL-001
+        matchedText:
+          type: string
+        excerpt:
+          type: string
+          description: Context around the match; the UI highlights matchedText inside it
+        position:
+          type: integer
+          description: Zero-based character offset of matchedText in the filing content
+    ProblemDetail:
+      type: object
+      description: RFC 9457 Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

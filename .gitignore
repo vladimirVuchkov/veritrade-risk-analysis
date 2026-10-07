@@ -1,0 +1,10 @@
+target/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.db
+data/
+.env
+build.log
+__pycache__/

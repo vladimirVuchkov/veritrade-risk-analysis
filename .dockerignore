@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+**/target
+**/data
+**/*.db
+docs
+frontend
+samples
+scripts
+infra
+.env
+build.log

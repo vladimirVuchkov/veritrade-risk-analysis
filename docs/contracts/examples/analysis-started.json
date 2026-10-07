@@ -1,0 +1,11 @@
+{
+  "eventId": "1247b44c-49ca-375a-a817-c55086f43982",
+  "eventType": "ANALYSIS_STARTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-07T12:00:01Z",
+  "correlationId": "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20",
+  "payload": {
+    "filingId": "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12",
+    "startedAt": "2026-10-07T12:00:01Z"
+  }
+}

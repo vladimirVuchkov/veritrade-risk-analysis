@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://veritrade.example/contracts/analysis-completed.schema.json",
+  "title": "AnalysisCompleted",
+  "description": "Published by Analysis with routing key analysis.completed. Terminal event.",
+  "allOf": [{ "$ref": "event-envelope.schema.json" }],
+  "properties": {
+    "eventType": { "const": "ANALYSIS_COMPLETED" },
+    "payload": {
+      "type": "object",
+      "required": ["filingId", "analyzedAt", "rulesVersion", "summary", "findings"],
+      "properties": {
+        "filingId": { "$ref": "event-envelope.schema.json#/$defs/uuid" },
+        "analyzedAt": { "$ref": "event-envelope.schema.json#/$defs/timestamp" },
+        "rulesVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "summary": {
+          "type": "object",
+          "required": ["totalFindings", "overallRiskLevel", "byCategory"],
+          "properties": {
+            "totalFindings": { "type": "integer", "minimum": 0 },
+            "overallRiskLevel": { "$ref": "event-envelope.schema.json#/$defs/riskLevel" },
+            "byCategory": {
+              "type": "object",
+              "description": "Number of findings per category; categories without findings are omitted.",
+              "propertyNames": { "$ref": "event-envelope.schema.json#/$defs/riskCategory" },
+              "additionalProperties": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "severity", "ruleId", "matchedText", "excerpt", "position"],
+            "properties": {
+              "category": { "$ref": "event-envelope.schema.json#/$defs/riskCategory" },
+              "severity": { "$ref": "event-envelope.schema.json#/$defs/severity" },
+              "ruleId": { "type": "string", "pattern": "^[A-Z]+-[0-9]{3}$" },
+              "matchedText": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "excerpt": { "type": "string", "minLength": 1, "maxLength": 1000, "description": "Context around the match (about 120 characters on each side)." },
+              "position": { "type": "integer", "minimum": 0, "description": "Zero-based character offset of matchedText in the filing content." }
+            }
+          }
+        }
+      }
+    }
+  }
+}

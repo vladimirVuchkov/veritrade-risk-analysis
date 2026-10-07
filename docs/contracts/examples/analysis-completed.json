@@ -1,0 +1,47 @@
+{
+  "eventId": "6c3c4f56-06d6-393c-96cc-67ed6a106eca",
+  "eventType": "ANALYSIS_COMPLETED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-07T12:00:02Z",
+  "correlationId": "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20",
+  "payload": {
+    "filingId": "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12",
+    "analyzedAt": "2026-10-07T12:00:02Z",
+    "rulesVersion": "1.0",
+    "summary": {
+      "totalFindings": 3,
+      "overallRiskLevel": "HIGH",
+      "byCategory": {
+        "LEGAL": 1,
+        "CYBERSECURITY": 1,
+        "FINANCIAL": 1
+      }
+    },
+    "findings": [
+      {
+        "category": "LEGAL",
+        "severity": "HIGH",
+        "ruleId": "LEGAL-001",
+        "matchedText": "pending litigation",
+        "excerpt": "Item 1A. Risk Factors. We are subject to pending litigation relating to alleged patent infringement, and an adverse outcome could require us to pay substantial damages. In the pri",
+        "position": 41
+      },
+      {
+        "category": "CYBERSECURITY",
+        "severity": "HIGH",
+        "ruleId": "CYBER-001",
+        "matchedText": "cybersecurity incident",
+        "excerpt": "ingement, and an adverse outcome could require us to pay substantial damages. In the prior fiscal year we experienced a cybersecurity incident that exposed limited customer data. Management identified a material weakness in our internal control over financial re",
+        "position": 211
+      },
+      {
+        "category": "FINANCIAL",
+        "severity": "HIGH",
+        "ruleId": "FIN-002",
+        "matchedText": "material weakness",
+        "excerpt": "e prior fiscal year we experienced a cybersecurity incident that exposed limited customer data. Management identified a material weakness in our internal control over financial reporting.",
+        "position": 294
+      }
+    ]
+  }
+}

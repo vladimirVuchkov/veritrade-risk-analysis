@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://veritrade.example/contracts/analysis-started.schema.json",
+  "title": "AnalysisStarted",
+  "description": "Published by Analysis with routing key analysis.started before the rules run.",
+  "allOf": [{ "$ref": "event-envelope.schema.json" }],
+  "properties": {
+    "eventType": { "const": "ANALYSIS_STARTED" },
+    "payload": {
+      "type": "object",
+      "required": ["filingId", "startedAt"],
+      "properties": {
+        "filingId": { "$ref": "event-envelope.schema.json#/$defs/uuid" },
+        "startedAt": { "$ref": "event-envelope.schema.json#/$defs/timestamp" }
+      }
+    }
+  }
+}

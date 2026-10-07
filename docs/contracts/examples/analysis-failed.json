@@ -1,0 +1,12 @@
+{
+  "eventId": "83167d8a-e329-3629-bcde-9a13def226ab",
+  "eventType": "ANALYSIS_FAILED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-07T12:00:05Z",
+  "correlationId": "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20",
+  "payload": {
+    "filingId": "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12",
+    "failedAt": "2026-10-07T12:00:05Z",
+    "reason": "Analysis failed after 3 attempts: rule engine error"
+  }
+}

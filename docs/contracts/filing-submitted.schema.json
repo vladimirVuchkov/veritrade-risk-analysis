@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://veritrade.example/contracts/filing-submitted.schema.json",
+  "title": "FilingSubmitted",
+  "description": "Published by Ingestion (through its outbox) with routing key filing.submitted.",
+  "allOf": [{ "$ref": "event-envelope.schema.json" }],
+  "properties": {
+    "eventType": { "const": "FILING_SUBMITTED" },
+    "payload": {
+      "type": "object",
+      "required": ["filingId", "companyName", "title", "content", "submittedAt"],
+      "properties": {
+        "filingId": { "$ref": "event-envelope.schema.json#/$defs/uuid" },
+        "companyName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "content": { "type": "string", "minLength": 1, "maxLength": 2097152, "description": "Full filing text. Ingestion enforces a limit of 2 MB of UTF-8." },
+        "submittedAt": { "$ref": "event-envelope.schema.json#/$defs/timestamp" }
+      }
+    }
+  }
+}
