@@ -31,8 +31,9 @@ parallel, each in its own folder and git worktree, against a contract frozen in 
   - `docs/AGENT-RULES.md`, this log, and `scripts/export-ai-conversation.py`.
 - **My intervention:** _to be completed_
 - **Decision:** _to be completed_
-- **Verification:** `./mvnw -B verify` green (29 contract tests, 3 context tests); Flyway applies V1 in both services; the layered jar of a service starts with the Spring Boot launcher and serves `/actuator/health`; the export tool tested on a synthetic transcript (filtering, masking, denylist stop, turn removal).
+- **Verification:** `./mvnw -B verify` green (29 contract tests, 3 context tests); Flyway applies V1 in both services; the layered jar of a service starts with the Spring Boot launcher and serves `/actuator/health`; the export tool tested on a synthetic transcript (filtering, masking, denylist stop, turn removal); `docker compose up --build` brings up RabbitMQ and the three services, all healthy, running as a non-root user, with the H2 files on named volumes and only port 15672 published (the UI port is added with the frontend in Wave 1).
 - **Problems/lessons:**
+  - Docker was not installed on the development machine; a separate agent set up colima with the Docker CLI, Compose and Buildx and verified Testcontainers with a RabbitMQ container.
   - Spring Boot 4 split the test starters per technology (`spring-boot-starter-webmvc-test`, `-data-jpa-test`, `-amqp-test`), and Testcontainers 2 renamed its modules (`testcontainers-rabbitmq`); names were checked against Maven Central instead of assumed.
   - json-schema-validator 3.x has a new API (`SchemaRegistry`); a negative test proves that the `$ref` between schemas is resolved and that invalid events are rejected.
   - The first version of the export tool printed the matched denylist terms in its own report, which would have leaked them into the next exported record. The report now masks the match and names only the denylist line.
