@@ -148,3 +148,104 @@
   - real runs on colima that found the Ingestion `__TypeId__` dead-letter bug, plus a throwaway
     patched run showing that everything passes once that bug is fixed.
 - Fixed by hand: nothing; the Ingestion bug the scripts found was fixed by Agent A, after which smoke and all six chaos scenarios passed
+
+---
+
+# Wave 3 - Agent E (Infrastructure, review fixes)
+
+## Done
+- **W3-04: published ports and broker credentials.**
+  - Both published ports (UI 8080, management UI 15672) are bound to `BIND_ADDRESS`, default
+    `127.0.0.1` (`docker-compose.yml`, `.env.example`).
+  - Credential decision: the default `veritrade`/`veritrade` stays, so `docker compose up --build`
+    still needs no manual step. It is no longer silent:
+    - RabbitMQ now builds from `infra/docker/rabbitmq.Dockerfile`, which puts
+      `infra/rabbitmq/credentials-guard.sh` in front of the official entrypoint.
+    - A known weak password (`veritrade`, the `.env.example` placeholder `change-me`, `guest`, empty) on a
+      loopback `BIND_ADDRESS` starts the broker with a `WARNING` line in its log.
+    - The same weak password with any other `BIND_ADDRESS` (for example `0.0.0.0`) stops the container
+      with an `ERROR` line, so `up --wait` fails. Publishing beyond loopback requires a real
+      `RABBITMQ_PASSWORD`.
+    - `smoke.sh` and `chaos.sh` print a warning when they run with a weak password.
+  - The scripts reach the stack on `BIND_ADDRESS` (`localhost` for a wildcard address). The e2e harness
+    removes `BIND_ADDRESS` from its environment, so it tests the compose default. It now reads the host
+    from `docker compose port` instead of assuming `localhost`.
+- **nginx timeouts.** `proxy_connect_timeout 2s`, `proxy_send_timeout 30s`, `proxy_read_timeout 30s`
+  (named and commented), `resolver ... valid=5s` (was 10 s) and `resolver_timeout 2s`.
+  - Cause of the old hang: for up to `valid` seconds after a stop, nginx still connects to the old
+    container address. That address does not answer (ARP fails, `113: Host is unreachable`, about
+    14-15 s), and the 60 s default connect timeout did not cut it short.
+  - 503 timing for a request that hits the stale address:
+    - before: 14.3 s (manual), 15 s curl timeout in chaos (b) against the old config;
+    - after: 2.0 s (manual, 8 requests), slowest 2006-2011 ms in chaos (b).
+    A stopped service whose name no longer resolves answers in about 30 ms.
+  - The retry workarounds are gone: chaos (b) no longer uses `wait_for_report ... 503`, and
+    `ServiceOutageE2E` no longer uses `awaitServiceUnavailable` or `Timeouts.UPSTREAM_GONE` (90 s).
+- **Content-Security-Policy.** `infra/nginx/security-headers.conf` is included at server level and in
+  `location /`, so every response carries it, including nginx's own problem responses:
+  `default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`.
+  There is no `'unsafe-inline'`. `frontend/index.html` has no inline script, style or event handler,
+  and `frontend/js` sets no inline styles and uses no `eval`, so nothing was requested from Agent D.
+
+## Tests and checks
+- **Bind address.**
+  - `smoke.sh` checks that `docker compose port` shows `$BIND_ADDRESS` for `frontend 8080` and `rabbitmq 15672`.
+  - `PublishedPortsE2E` checks that both bindings start with `127.0.0.1:`.
+- **Credentials guard.**
+  - `smoke.sh` runs only the check, `docker compose run --rm --no-deps rabbitmq check`, three times:
+    a weak password on `0.0.0.0` is refused, a weak password on loopback warns, and a strong password
+    on `0.0.0.0` passes silently.
+  - `smoke.sh` and `PublishedPortsE2E` also check that the running broker logged the warning. Both skip
+    this check when they run with a strong password.
+- **CSP.**
+  - `smoke.sh` checks the header on `/`, `js/app.js`, `styles.css`, an API response and nginx's 404
+    problem, and checks that `index.html` has no inline code.
+  - `StaticUiE2E` asserts the exact header on static files, API responses and nginx problem responses,
+    and that `index.html` has no inline script, style, `on*=` handler or `javascript:` URL.
+- **Fast 503.** The check probes the URL every 200 ms in the background while
+  `docker compose stop` runs, and keeps probing for 7 s after it (longer than nginx's 5 s cache). This
+  forces requests onto the stale address. Every answer must arrive in under 5 s, and every request sent
+  after the stop must be a 503 problem+json, with no retry.
+  - Implemented in chaos (b) (`stop_with_fast_unavailable`) and in `ServiceOutageE2E` (support class
+    `UpstreamProbe`, `Timeouts.UPSTREAM_UNAVAILABLE` = 5 s, `UPSTREAM_ADDRESS_CACHE` = 7 s), for
+    Reporting and Ingestion.
+  - Chaos (b) against the old nginx config (copied into the running container) fails: 15 s, no answer.
+
+## Results on this machine (colima, arm64)
+- `docker compose up --build -d --wait`: green in about 15 s. Both ports are on `127.0.0.1`; RabbitMQ
+  logs the warning.
+- `scripts/smoke.sh`: passed (report after 104-676 ms).
+- `scripts/chaos.sh`: all six passed (a 8.9 s, b 13.0 s, c 3.5 s, d 0.1 s, e 5.2 s, f 0.8 s).
+- `docker compose down -v`: green.
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B -Pe2e verify -pl e2e-tests -am`:
+  137 tests, 0 failures, in 4:00 (ServiceOutageE2E 104 s).
+
+## Known issues and limitations
+- The warning is in the rabbitmq container log (`docker compose logs rabbitmq`) and in the script
+  output. `docker compose up -d` itself does not print container logs.
+- The weak-password list is a fixed list. A different weak password counts as strong.
+- `BIND_ADDRESS` also controls the UI port. A non-loopback UI has no authentication. That is the
+  operator's explicit choice.
+- `RABBITMQ_PASSWORD` is still stored in the `rabbitmq-data` volume on first start (`down -v` after
+  changing it).
+- The e2e suite reads `.env` through docker compose like before. A `.env` with a non-loopback
+  `BIND_ADDRESS` makes `PublishedPortsE2E` fail by design.
+
+## Requests to other owners
+- **Agent G (docs):** in the README, say that the UI and the management UI listen on `127.0.0.1`
+  only, list `BIND_ADDRESS`, and explain the default-password rule (warning on loopback, refused
+  elsewhere). Mention the CSP if the README lists security headers.
+- **Agent D (frontend):** no request. Keep the UI free of inline scripts, styles and `style=`/`on*=`
+  attributes. `StaticUiE2E` and `smoke.sh` fail otherwise.
+
+## How to verify
+- `docker compose up --build -d --wait && docker compose ps`: the published ports show `127.0.0.1:`.
+- `docker compose logs rabbitmq | head -1`: the default-password warning.
+- `BIND_ADDRESS=0.0.0.0 docker compose up -d --wait`: fails, and `docker compose logs rabbitmq` shows
+  the ERROR line.
+- `scripts/smoke.sh`, `scripts/chaos.sh b` (prints the slowest answer across the stop), then
+  `docker compose down -v`.
+
+## AI record
+- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Fixed by hand: nothing; the branch merged without conflicts, and the requests above were done by Agent G.

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -15,14 +16,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Takes the correlation id from the request header, or generates one when it is absent, blank or too
- * long. It is put in the logging context, exposed as a request attribute and returned in the response.
+ * Takes the correlation id from the request header when it is a strict token: 1 to {@code maxLength}
+ * characters from {@code [A-Za-z0-9._:-]}, after surrounding whitespace is stripped. Any other value
+ * (absent, blank, too long, non-ASCII, control characters, inner spaces) is replaced with a generated
+ * UUID; the request is never rejected for it. The id is put in the logging context, exposed as a request
+ * attribute and returned in the response.
+ *
+ * <p>The token is ASCII, so it is at most {@code maxLength} bytes in UTF-8 and always fits the AMQP
+ * {@code correlationId} short string (255 bytes), the {@code outbox.correlation_id} column and a log line.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String REQUEST_ATTRIBUTE = "com.veritrade.ingestion.correlationId";
+
+    private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9._:-]+");
 
     private final int maxLength;
 
@@ -45,9 +54,10 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     }
 
     private String resolve(String header) {
-        if (header == null || header.isBlank() || header.strip().length() > maxLength) {
+        String candidate = header == null ? "" : header.strip();
+        if (candidate.isEmpty() || candidate.length() > maxLength || !TOKEN.matcher(candidate).matches()) {
             return UUID.randomUUID().toString();
         }
-        return header.strip();
+        return candidate;
     }
 }

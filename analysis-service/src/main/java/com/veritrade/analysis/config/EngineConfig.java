@@ -41,7 +41,7 @@ public class EngineConfig {
         return new RiskAnalyzer(
                 ruleSet,
                 new RuleMatcher(properties.maxMatchesPerRule(), properties.maxMatchedTextChars()),
-                new ExcerptExtractor(properties.excerptContextChars()),
+                new ExcerptExtractor(properties.excerptContextChars(), properties.maxExcerptChars()),
                 new RiskScorer(properties.escalationThreshold()));
     }
 }

@@ -19,7 +19,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
 /**
- * Reads the rules YAML, validates every rule and precompiles its patterns. Any problem makes
+ * Reads the rules YAML, validates every rule and precompiles its patterns, with every literal space
+ * made whitespace-tolerant by {@link WhitespaceTolerance}. Any problem makes
  * {@link #load} throw a {@link RuleValidationException} that lists all problems, so a broken rules
  * file stops the service at startup instead of producing wrong results later.
  */
@@ -148,14 +149,17 @@ public final class RuleLoader {
             return Optional.empty();
         }
         try {
-            Pattern pattern = Pattern.compile(regex, PATTERN_FLAGS);
+            Pattern pattern = Pattern.compile(WhitespaceTolerance.rewrite(regex), PATTERN_FLAGS);
             if (pattern.matcher("").matches()) {
                 errors.add(where + ": pattern '" + regex + "' matches empty text");
                 return Optional.empty();
             }
             return Optional.of(pattern);
         } catch (PatternSyntaxException e) {
-            errors.add(where + ": invalid regex '" + regex + "': " + e.getDescription() + " near index " + e.getIndex());
+            errors.add(where + ": invalid regex '" + regex + "': " + e.getDescription());
+            return Optional.empty();
+        } catch (IllegalArgumentException e) {
+            errors.add(where + ": pattern '" + regex + "': " + e.getMessage());
             return Optional.empty();
         }
     }

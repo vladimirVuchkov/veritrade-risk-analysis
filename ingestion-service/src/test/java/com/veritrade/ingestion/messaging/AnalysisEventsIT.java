@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
 import com.veritrade.contracts.messaging.EventIds;
 import com.veritrade.ingestion.domain.Filing;
@@ -31,7 +32,6 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.amqp.support.converter.AbstractJacksonMessageConverter;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +57,7 @@ class AnalysisEventsIT {
     private static final String TYPE_ID_HEADER = "__TypeId__";
     private static final String ENVELOPE_CLASS = "com.veritrade.contracts.event.EventEnvelope";
     private static final String DLQ = "ingestion.analysis-events.dlq";
+    private static final int MAX_REASON_LENGTH = 1000;
     private static final Duration WAIT = Duration.ofSeconds(15);
     /** Longer than every retry back-off together (1 s + 2 s), so a retry would have happened. */
     private static final Duration LONGER_THAN_RETRIES = Duration.ofSeconds(4);
@@ -152,7 +153,7 @@ class AnalysisEventsIT {
         assertThat(listenerRegistry.getListenerContainers()).hasSize(1);
         assertThat(converter).isNotInstanceOf(AbstractJacksonMessageConverter.class);
         assertThat(applicationContext.getBeanNamesForType(MessageConverter.class)).isEmpty();
-        assertThat(rabbitTemplate.getMessageConverter()).isInstanceOf(JacksonJsonMessageConverter.class);
+        assertThat(rabbitTemplate.getMessageConverter()).isNotInstanceOf(AbstractJacksonMessageConverter.class);
     }
 
     @Test
@@ -216,6 +217,51 @@ class AnalysisEventsIT {
         assertDeadLettered(event, "analysis.failed");
         verify(reader, after(LONGER_THAN_RETRIES.toMillis()).times(1))
                 .read(argThat(body -> new String(body, StandardCharsets.UTF_8).contains(filingId.toString())));
+    }
+
+    /** Contract, "Event versioning": no retries, not applied, kept in the dead-letter queue for a replay. */
+    @Test
+    void newerEventVersionGoesStraightToTheDeadLetterQueueAndIsNotApplied() {
+        UUID filingId = storedFiling();
+        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, filingId);
+        event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
+        Instant sentAt = Instant.now();
+
+        assertDeadLettered(event, "analysis.completed");
+
+        assertThat(Duration.between(sentAt, Instant.now())).isLessThan(FIRST_RETRY_DONE);
+        verify(reader, after(LONGER_THAN_RETRIES.toMillis()).times(1))
+                .read(argThat(body -> new String(body, StandardCharsets.UTF_8).contains(filingId.toString())));
+        assertThat(filings.findById(filingId).orElseThrow().status()).isEqualTo(FilingStatus.SUBMITTED);
+    }
+
+    /** Contract, "Text limits": a reason one UTF-16 unit over the limit is dead-lettered, not cut. */
+    @Test
+    void failureReasonOverTheLimitGoesStraightToTheDeadLetterQueueAndIsNotApplied() {
+        UUID filingId = storedFiling();
+        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        ((ObjectNode) event.get("payload")).put("reason", "r".repeat(MAX_REASON_LENGTH - 1) + "\uD83D\uDCC8");
+        Instant sentAt = Instant.now();
+
+        assertDeadLettered(event, "analysis.failed");
+
+        assertThat(Duration.between(sentAt, Instant.now())).isLessThan(FIRST_RETRY_DONE);
+        verify(statusService, after(LONGER_THAN_RETRIES.toMillis()).never())
+                .apply(argThat(update -> update.filingId().equals(filingId)));
+        assertThat(filings.findById(filingId).orElseThrow().status()).isEqualTo(FilingStatus.SUBMITTED);
+    }
+
+    @Test
+    void failureReasonOfExactlyTheLimitIsStoredWhole() {
+        UUID filingId = storedFiling();
+        String reason = "r".repeat(MAX_REASON_LENGTH - 2) + "\uD83D\uDCC8";
+        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        ((ObjectNode) event.get("payload")).put("reason", reason);
+
+        send(EventType.ANALYSIS_FAILED, event);
+
+        awaitStatus(filingId, FilingStatus.FAILED);
+        assertThat(filings.findById(filingId).orElseThrow().failureReason()).isEqualTo(reason);
     }
 
     @Test

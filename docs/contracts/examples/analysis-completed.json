@@ -7,7 +7,7 @@
   "payload": {
     "filingId": "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12",
     "analyzedAt": "2026-10-07T12:00:02Z",
-    "rulesVersion": "1.0",
+    "rulesVersion": "1.1",
     "summary": {
       "totalFindings": 3,
       "overallRiskLevel": "HIGH",

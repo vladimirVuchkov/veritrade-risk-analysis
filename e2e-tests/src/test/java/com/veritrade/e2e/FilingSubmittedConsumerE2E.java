@@ -3,6 +3,7 @@ package com.veritrade.e2e;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
 import com.veritrade.contracts.messaging.EventIds;
 import com.veritrade.e2e.support.ComposeStack;
@@ -18,17 +19,19 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Scenarios 10, 14 and 15 for Analysis: filing.submitted messages that the outbox never sends
- * (a redelivery, a Java type header, unknown fields, a higher version), published by the test.
+ * (a redelivery, a Java type header, unknown fields, an unsupported higher version), published by the test.
  * A message for a filing id that Ingestion does not know still gets a report, because Reporting keys
  * reports by filing id only; that makes a wrong result of Analysis visible through the REST API.
  */
 class FilingSubmittedConsumerE2E extends E2ETestBase {
 
     private static final int REDELIVERED_ANALYSES = 2;
+    private static final int NOT_FOUND = 404;
 
     @Test
     void redeliveredFilingSubmittedIsAnalysedAgainAndChangesNothing() {
@@ -80,17 +83,22 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
         ReportAssertions.assertConsistentCompletedReport(api.awaitReport(filingId), filing.content());
     }
 
-    /** Not specified by the contract: Analysis reads the fields it knows and analyses a version 2 filing. */
+    /** Contract "Event versioning": a version Analysis does not support waits in its dead-letter queue. */
     @Test
-    void higherEventVersionOfFilingSubmittedIsAnalysed() {
-        FilingRequest filing = system.demoFiling();
+    void higherEventVersionOfFilingSubmittedIsDeadLetteredWithoutRetries() {
         UUID filingId = UUID.randomUUID();
-        ObjectNode event = submittedEvent(filingId, filing);
-        event.put("eventVersion", 2);
+        ObjectNode event = submittedEvent(filingId, system.demoFiling());
+        event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
 
         broker.publishEvent(event);
 
-        ReportAssertions.assertConsistentCompletedReport(api.awaitReport(filingId), filing.content());
+        JsonNode deadLetter = DeadLetters.awaitDeadLettered(broker, DeadLetters.ANALYSIS_DLQ, filingId.toString());
+        assertThat(DeadLetters.death(deadLetter).path("reason").asString()).isEqualTo("rejected");
+        assertThat(DeadLetters.death(deadLetter).path("count").asInt()).isOne();
+        system.awaitLogLine(ComposeStack.ANALYSIS, "Unsupported eventVersion " + (EventEnvelope.CURRENT_VERSION + 1),
+                event.path("eventId").asString());
+        assertThat(system.countLogLines(ComposeStack.ANALYSIS, "Analysing filing " + filingId)).isZero();
+        assertThat(api.report(filingId).status()).isEqualTo(NOT_FOUND);
     }
 
     private static ObjectNode submittedEvent(UUID filingId, FilingRequest filing) {

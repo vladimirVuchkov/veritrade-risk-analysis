@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.veritrade.analysis.support.ContractFixtures;
 import com.veritrade.analysis.support.RabbitIntegrationTest;
+import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
 import com.veritrade.contracts.messaging.EventIds;
 import com.veritrade.contracts.messaging.MessagingTopology;
@@ -101,6 +102,21 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
         sendFilingSubmitted(event.toString());
 
         assertRejectedOnce(receive(DEAD_LETTER_QUEUE));
+        verify(listener, times(1)).onFilingSubmitted(any());
+        verify(reader, times(1)).read(any());
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void sendsANewerEventVersionToTheDeadLetterQueueWithoutRetriesOrEvents() {
+        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
+
+        sendFilingSubmitted(event.toString());
+
+        Message dead = receive(DEAD_LETTER_QUEUE);
+        assertThat(json(dead)).isEqualTo(event);
+        assertRejectedOnce(dead);
         verify(listener, times(1)).onFilingSubmitted(any());
         verify(reader, times(1)).read(any());
         assertNoMoreMessages(CAPTURE_QUEUE);

@@ -3,6 +3,8 @@ package com.veritrade.ingestion.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.veritrade.ingestion.messaging.InvalidEventException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
@@ -13,12 +15,11 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.listener.ListenerExecutionFailedException;
 import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConversionException;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
 import org.springframework.boot.retry.RetryPolicySettings;
-import tools.jackson.databind.json.JsonMapper;
 
 /** The declarations must match docs/contracts/messaging-topology.md exactly, or RabbitMQ refuses them. */
 class RabbitConfigTest {
@@ -90,12 +91,16 @@ class RabbitConfigTest {
     }
 
     @Test
-    void templateUsesTheJacksonJsonConverterAndTheRecovererRejects() {
-        RabbitTemplate template = new RabbitTemplate();
-        config.jsonTemplateConverter(JsonMapper.builder().build()).customize(template);
-
-        assertThat(template.getMessageConverter()).isInstanceOf(JacksonJsonMessageConverter.class);
+    void recovererRejectsSoTheMessageGoesToTheDeadLetterQueue() {
         assertThat(config.messageRecoverer()).isInstanceOf(RejectAndDontRequeueRecoverer.class);
+    }
+
+    /** A converter here would either be dead code or reach the listener container (see the class Javadoc). */
+    @Test
+    void declaresNoMessageConverterAndNoTemplateCustomizer() {
+        assertThat(Arrays.stream(RabbitConfig.class.getDeclaredMethods()).map(Method::getReturnType))
+                .noneMatch(MessageConverter.class::isAssignableFrom)
+                .noneMatch(RabbitTemplateCustomizer.class::isAssignableFrom);
     }
 
     @Test

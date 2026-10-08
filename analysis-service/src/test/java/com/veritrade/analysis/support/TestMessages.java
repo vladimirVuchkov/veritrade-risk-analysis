@@ -6,9 +6,11 @@ import com.veritrade.analysis.engine.RiskScorer;
 import com.veritrade.analysis.engine.RuleLoader;
 import com.veritrade.analysis.engine.RuleMatcher;
 import com.veritrade.analysis.engine.RuleSet;
+import com.veritrade.analysis.messaging.MessagingProperties;
 import com.veritrade.contracts.event.EventType;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
@@ -19,8 +21,14 @@ public final class TestMessages {
 
     private static final int CAP = 50;
     private static final int MAX_MATCH = 500;
+    private static final int MAX_EXCERPT = 1000;
     private static final int CONTEXT = 120;
     private static final int THRESHOLD = 10;
+    private static final Duration CONFIRM_TIMEOUT = Duration.ofSeconds(5);
+
+    /** The default messaging settings, as bound from an empty configuration. */
+    public static final MessagingProperties MESSAGING =
+            new MessagingProperties(CONFIRM_TIMEOUT, MessagingProperties.SCHEMA_MAX_REASON_LENGTH);
 
     private TestMessages() {
     }
@@ -47,7 +55,7 @@ public final class TestMessages {
         String rules = ContractFixtures.text("risk-rules.yml");
         RuleSet ruleSet = new RuleLoader().load(
                 new ByteArrayInputStream(rules.getBytes(StandardCharsets.UTF_8)), "risk-rules.yml");
-        return new RiskAnalyzer(ruleSet, new RuleMatcher(CAP, MAX_MATCH), new ExcerptExtractor(CONTEXT),
+        return new RiskAnalyzer(ruleSet, new RuleMatcher(CAP, MAX_MATCH), new ExcerptExtractor(CONTEXT, MAX_EXCERPT),
                 new RiskScorer(THRESHOLD));
     }
 }

@@ -14,7 +14,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads and validates a {@code filing.submitted} message body. Unknown fields are ignored (tolerant
- * reader); the event type comes from the {@code eventType} field, never from a Java type header.
+ * reader); the event type comes from the {@code eventType} field, never from a Java type header. A
+ * newer {@code eventVersion} than {@link EventEnvelope#CURRENT_VERSION} is rejected without retries, so
+ * the message can be replayed from the dead-letter queue after an upgrade.
  */
 @Component
 public class FilingSubmittedReader {
@@ -50,6 +52,11 @@ public class FilingSubmittedReader {
         if (event.eventType() != EventType.FILING_SUBMITTED) {
             throw new InvalidFilingMessageException("Unexpected eventType " + event.eventType()
                     + " on the filing.submitted queue (event " + event.eventId() + ")");
+        }
+        if (event.eventVersion() > EventEnvelope.CURRENT_VERSION) {
+            throw new InvalidFilingMessageException("Unsupported eventVersion " + event.eventVersion()
+                    + " of event " + event.eventId() + "; this service supports up to "
+                    + EventEnvelope.CURRENT_VERSION + ", so the message waits in the dead-letter queue for a replay");
         }
         List<String> missing = missingFields(event);
         if (!missing.isEmpty()) {

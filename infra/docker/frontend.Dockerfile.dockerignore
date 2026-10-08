@@ -2,6 +2,7 @@
 # are sent to the builder. mock/, test/, package.json and README.md never reach the image.
 *
 !infra/nginx/default.conf
+!infra/nginx/security-headers.conf
 !frontend/index.html
 !frontend/styles.css
 !frontend/js/

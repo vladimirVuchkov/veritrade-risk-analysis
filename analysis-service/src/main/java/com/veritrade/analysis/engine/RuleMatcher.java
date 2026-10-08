@@ -35,7 +35,7 @@ public final class RuleMatcher {
     }
 
     /** Non-overlapping matches of the rule, earliest first, at most {@code maxMatchesPerRule}. */
-    public List<Match> findMatches(RiskRule rule, String text) {
+    public List<Match> findMatches(RiskRule rule, CharSequence text) {
         List<Match> candidates = new ArrayList<>();
         for (Pattern pattern : rule.patterns()) {
             collect(pattern, text, candidates);
@@ -44,7 +44,7 @@ public final class RuleMatcher {
         return firstNonOverlapping(candidates);
     }
 
-    private void collect(Pattern pattern, String text, List<Match> into) {
+    private void collect(Pattern pattern, CharSequence text, List<Match> into) {
         Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             if (matcher.end() > matcher.start()) {
@@ -53,7 +53,7 @@ public final class RuleMatcher {
         }
     }
 
-    private int clippedEnd(String text, int start, int end) {
+    private int clippedEnd(CharSequence text, int start, int end) {
         if (end - start <= maxMatchLength) {
             return end;
         }

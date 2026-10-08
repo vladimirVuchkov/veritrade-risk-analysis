@@ -9,6 +9,8 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # Fail fast while the broker is down, so a shutdown during an outage stays within Docker's grace period.
+    connection-timeout: 2s
     publisher-confirm-type: correlated
     publisher-returns: true
     template:

@@ -3,6 +3,7 @@ package com.veritrade.e2e;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
 import com.veritrade.contracts.model.RiskCategory;
 import com.veritrade.contracts.model.Severity;
@@ -44,6 +45,7 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     private static final String EMOJI = "📈";
     private static final int MAX_MATCHED_TEXT_UNITS = 500;
     private static final int EMOJI_UNITS = 2;
+    private static final int MAX_REASON_UNITS = 1000;
 
     /** Final status and report of each filing whose outcome must survive the late real analysis. */
     private static final Map<UUID, Outcome> SETTLED = new ConcurrentHashMap<>();
@@ -188,20 +190,35 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     }
 
     /**
-     * The contract leaves a higher eventVersion to the consumers. Ingestion applies it (it reads only
-     * the fields it knows); Reporting dead-letters it so it can be replayed after an upgrade (README).
+     * Contract, "Event versioning": a consumer dead-letters an eventVersion above the one it supports, without
+     * retries, so it can be replayed after an upgrade. Ingestion and Reporting both do, so nothing changes.
      */
     @Test
-    void higherEventVersionIsAppliedByIngestionAndDeadLetteredByReporting() {
+    void higherEventVersionIsDeadLetteredByIngestionAndReporting() {
         UUID filingId = submit();
         ObjectNode completed = completed(filingId, twoFindings());
-        completed.put("eventVersion", 2);
+        completed.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
 
         broker.publishEvent(completed);
 
-        api.awaitStatus(filingId, "COMPLETED");
-        DeadLetters.awaitDeadLettered(broker, DeadLetters.REPORTING_DLQ, completed.path("eventId").asString());
+        String eventId = completed.path("eventId").asString();
+        DeadLetters.awaitDeadLettered(broker, DeadLetters.INGESTION_DLQ, eventId);
+        DeadLetters.awaitDeadLettered(broker, DeadLetters.REPORTING_DLQ, eventId);
+        assertThat(api.status(filingId)).isEqualTo("SUBMITTED");
         assertThat(api.report(filingId).status()).isEqualTo(NOT_FOUND);
+    }
+
+    /** Contract, "Text limits": a reason one UTF-16 unit over 1000 is dead-lettered by Ingestion, not cut. */
+    @Test
+    void failureReasonOverTheUtf16LimitIsDeadLetteredByIngestion() {
+        UUID filingId = submit();
+        String overLimit = "r".repeat(MAX_REASON_UNITS - 1) + EMOJI;
+        ObjectNode failed = Events.failed(UUID.randomUUID(), filingId, correlationId("reason-over-limit"), overLimit);
+
+        broker.publishEvent(failed);
+
+        DeadLetters.awaitDeadLettered(broker, DeadLetters.INGESTION_DLQ, failed.path("eventId").asString());
+        assertThat(api.status(filingId)).isEqualTo("SUBMITTED");
     }
 
     /** The contract counts text limits in UTF-16 units: 250 emoji are 500 units, at the matchedText limit. */

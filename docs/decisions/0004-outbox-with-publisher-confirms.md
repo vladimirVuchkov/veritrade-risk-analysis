@@ -26,3 +26,9 @@ stored. If it stores first, the event is lost when the service stops before it p
 - Analysis publishes directly, with confirms but without an outbox. It has no database. A failed
   publish is retried by the listener retry, and deterministic event ids make the repeats harmless.
 - Published rows are never deleted. Production would add a cleanup job.
+
+## Update (Wave 3)
+A row that the AMQP client refuses before it reaches the broker is counted and, after
+`ingestion.outbox.max-attempts` (default 5), parked, so it no longer blocks later rows. Broker
+failures still stop the run without counting, and a failed run is followed by an exponential back-off
+(1 s up to 10 s). See [ADR 0011](0011-park-poison-outbox-rows.md).

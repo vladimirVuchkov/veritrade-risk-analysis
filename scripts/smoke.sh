@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Smoke test of the running Compose stack, through nginx only (http://localhost:8080).
+# Smoke test of the running Compose stack, through nginx (http://127.0.0.1:8080), plus the published
+# ports and the broker credentials check through docker compose.
 #   docker compose up --build -d --wait && scripts/smoke.sh
 # Exits non-zero when any check fails; every failed check is printed.
 set -euo pipefail
@@ -12,6 +13,8 @@ REPORT_DEADLINE_SECONDS=10         # success criterion C2: submit -> report with
 MAX_CONTENT_BYTES=2097152          # 2 MB, the limit of the REST contract
 LIST_LIMIT=100
 UNKNOWN_FILING_ID="00000000-0000-4000-8000-000000000000"
+CONTENT_SECURITY_POLICY="default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+WEAK_PASSWORD_WARNING="WARNING: RabbitMQ runs with a known default password"
 
 FAILURES=0
 
@@ -43,6 +46,28 @@ check_ui() {
         http GET "$BASE_URL/$hidden"
         check "GET /$hidden is not served (404)" status_is 404
     done
+}
+
+csp_is_set() { [ "$(response_header Content-Security-Policy)" = "$CONTENT_SECURITY_POLICY" ]; }
+
+# The CSP forbids inline code; index.html must not need any.
+has_no_inline_code() {
+    local inline_scripts
+    inline_scripts="$(printf '%s' "$HTTP_BODY" | grep -o -i -E '<script[^>]*>' | grep -v 'src=' || true)"
+    [ -z "$inline_scripts" ] \
+        && ! printf '%s' "$HTTP_BODY" | grep -q -i -E '<style[ >]| style=| on[a-z]+=|javascript:'
+}
+
+check_security_headers() {
+    log "${BOLD}Security headers${RESET}"
+    local path
+    for path in "" js/app.js styles.css "api/filings?limit=1" api/unknown; do
+        http GET "$BASE_URL/$path"
+        check "GET /$path has the Content-Security-Policy" csp_is_set
+        check "GET /$path has X-Content-Type-Options nosniff" [ "$(response_header X-Content-Type-Options)" = "nosniff" ]
+    done
+    http GET "$BASE_URL/"
+    check "index.html has no inline script, style or event handler" has_no_inline_code
 }
 
 check_errors() {
@@ -153,11 +178,65 @@ check_size_limit() {
     check "content of 2 MB + 1 byte -> 400 application/problem+json (not 413)" problem_with 400
 }
 
+# published_on SERVICE PORT: docker compose port shows the binding on BIND_ADDRESS.
+published_on() {
+    local binding
+    binding="$(compose port "$1" "$2" 2> /dev/null)"
+    HTTP_STATUS="-"; HTTP_CONTENT_TYPE=""; HTTP_BODY="binding '$binding', expected $BIND_ADDRESS"
+    case "$binding" in
+        "$BIND_ADDRESS":*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# guard_run PASSWORD BIND_ADDRESS: runs only the credentials check of the rabbitmq image.
+guard_run() {
+    local result=0
+    compose run --rm --no-deps -T -e "RABBITMQ_DEFAULT_PASS=$1" -e "VERITRADE_BIND_ADDRESS=$2" \
+        rabbitmq check > "$WORK_DIR/guard" 2>&1 || result=$?
+    HTTP_STATUS="exit $result"; HTTP_CONTENT_TYPE=""; HTTP_BODY="$(grep -E 'WARNING|ERROR' "$WORK_DIR/guard" || true)"
+    return "$result"
+}
+
+guard_refuses() {
+    ! guard_run "$1" "$2" && grep -q "ERROR: the RabbitMQ password is a known default" "$WORK_DIR/guard"
+}
+
+guard_warns() {
+    guard_run "$1" "$2" && grep -q "$WEAK_PASSWORD_WARNING" "$WORK_DIR/guard"
+}
+
+guard_accepts_silently() {
+    guard_run "$1" "$2" && ! grep -q "WARNING" "$WORK_DIR/guard"
+}
+
+broker_logged_the_warning() {
+    HTTP_STATUS="-"; HTTP_CONTENT_TYPE=""; HTTP_BODY="no '$WEAK_PASSWORD_WARNING' in the rabbitmq log"
+    compose logs --no-color rabbitmq > "$WORK_DIR/rabbitmq.log" 2> /dev/null
+    grep -q "$WEAK_PASSWORD_WARNING" "$WORK_DIR/rabbitmq.log"
+}
+
+check_exposure() {
+    log "${BOLD}Published ports and broker credentials${RESET}"
+    check "UI is published on $BIND_ADDRESS only" published_on frontend 8080
+    check "management UI is published on $BIND_ADDRESS only" published_on rabbitmq 15672
+    check "a default password with a public bind address is refused" guard_refuses veritrade 0.0.0.0
+    check "a default password on loopback starts with a warning" guard_warns veritrade 127.0.0.1
+    check "a strong password on a public bind address starts without a warning" \
+        guard_accepts_silently "smoke-$(new_uuid)" 0.0.0.0
+    if is_weak_rabbit_password; then
+        check "the running broker logged the default-password warning" broker_logged_the_warning
+    fi
+}
+
 main() {
-    require_tools curl
+    require_tools curl docker
+    warn_if_weak_credentials
     log "${BOLD}VeriTrade smoke test against $BASE_URL${RESET}"
     wait_for_ui "$STARTUP_TIMEOUT_SECONDS" || die "the UI at $BASE_URL did not answer within ${STARTUP_TIMEOUT_SECONDS} s"
     check_ui
+    check_security_headers
+    check_exposure
     check_errors
     check_demo_flow
     check_list

@@ -18,14 +18,17 @@ import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.boot.amqp.autoconfigure.RabbitListenerRetrySettingsCustomizer;
-import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import tools.jackson.databind.json.JsonMapper;
 
-/** The topology Ingestion uses, exactly as in docs/contracts/messaging-topology.md. */
+/**
+ * The topology Ingestion uses, exactly as in docs/contracts/messaging-topology.md. There is deliberately
+ * no {@code MessageConverter} bean: Spring Boot would give it to the listener container, which would then
+ * convert the body by the producer's {@code __TypeId__} header before the reader sees it. The listener
+ * receives the raw message and {@code AnalysisEventReader} dispatches on {@code eventType}; the outbox
+ * publisher sends prebuilt messages.
+ */
 @Configuration
 public class RabbitConfig {
 
@@ -60,17 +63,6 @@ public class RabbitConfig {
     @Bean
     Binding analysisEventsDeadLetterBinding(Queue analysisEventsDeadLetterQueue, DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(analysisEventsDeadLetterQueue).to(deadLetterExchange).with(Q_INGESTION_ANALYSIS_EVENTS);
-    }
-
-    /**
-     * The JSON converter goes on the template only. It is deliberately not a {@code MessageConverter}
-     * bean: Spring Boot would also give it to the listener container, which would then convert the body
-     * by the producer's {@code __TypeId__} header before the reader sees it. The listener receives the
-     * raw message and {@code AnalysisEventReader} dispatches on {@code eventType}.
-     */
-    @Bean
-    RabbitTemplateCustomizer jsonTemplateConverter(JsonMapper jsonMapper) {
-        return template -> template.setMessageConverter(new JacksonJsonMessageConverter(jsonMapper));
     }
 
     /** After the last attempt the message is rejected without requeue, so it goes to the dead-letter queue. */

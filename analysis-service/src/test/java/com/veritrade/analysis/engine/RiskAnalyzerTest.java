@@ -6,7 +6,7 @@ import static com.veritrade.analysis.engine.TestRules.rule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 import com.veritrade.analysis.domain.AnalysisResult;
 import com.veritrade.analysis.domain.Finding;
@@ -17,7 +17,6 @@ import com.veritrade.contracts.event.FindingPayload;
 import com.veritrade.contracts.model.RiskCategory;
 import com.veritrade.contracts.model.RiskLevel;
 import com.veritrade.contracts.model.Severity;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,9 +26,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class RiskAnalyzerTest {
-
-    private static final int TWO_MB = 2 * 1024 * 1024;
-    private static final Duration TWO_MB_TIME_LIMIT = Duration.ofSeconds(5);
 
     private final RiskAnalyzer analyzer = TestRules.bundledAnalyzer();
 
@@ -42,7 +38,7 @@ class RiskAnalyzerTest {
         assertThat(result.totalFindings()).isZero();
         assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.NONE);
         assertThat(result.byCategory()).isEmpty();
-        assertThat(result.rulesVersion()).isEqualTo("1.0");
+        assertThat(result.rulesVersion()).isEqualTo("1.1");
     }
 
     @Test
@@ -174,17 +170,32 @@ class RiskAnalyzerTest {
     }
 
     @Test
-    void analysesTwoMegabytesWithinTheTimeLimit() {
-        String paragraph = ContractFixtures.text("samples/sample-10k-excerpt.txt");
-        String text = paragraph.repeat(TWO_MB / paragraph.length() + 1).substring(0, TWO_MB);
-
-        AnalysisResult result = assertTimeoutPreemptively(TWO_MB_TIME_LIMIT, () -> analyzer.analyze(text));
+    void capsEveryRuleOnTwoMegabytes() {
+        AnalysisResult result = analyzer.analyze(twoMegabytesOfSample());
 
         Map<String, Long> perRule = result.findings().stream()
                 .collect(Collectors.groupingBy(Finding::ruleId, Collectors.counting()));
         assertThat(perRule.values()).allMatch(count -> count <= DEFAULT_CAP);
         assertThat(perRule).containsEntry("FIN-002", (long) DEFAULT_CAP);
         assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.CRITICAL);
+    }
+
+    @Test
+    void analysesTwoMegabytesInLinearTime() {
+        RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, TestRules.DEFAULT_MAX_MATCH);
+        String text = twoMegabytesOfSample();
+
+        double readsPerChar = assertTimeout(TestRules.GENEROUS_TIME_LIMIT,
+                () -> CountingText.readsPerChar(TestRules.bundledRules(), matcher, text));
+
+        assertThat(readsPerChar).isLessThan(CountingText.MAX_LINEAR_READS_PER_CHAR);
+    }
+
+    @Test
+    void analysesTwoMegabytesWithinAGenerousTimeLimit() {
+        String text = twoMegabytesOfSample();
+
+        assertThat(assertTimeout(TestRules.GENEROUS_TIME_LIMIT, () -> analyzer.analyze(text)).findings()).isNotEmpty();
     }
 
     @Test
@@ -201,6 +212,11 @@ class RiskAnalyzerTest {
             assertThat(finding.excerpt()).contains(finding.matchedText());
             assertThat(finding.excerpt().length()).isLessThanOrEqualTo(finding.matchedText().length() + 2 * DEFAULT_CONTEXT);
         });
+    }
+
+    private static String twoMegabytesOfSample() {
+        String paragraph = ContractFixtures.text("samples/sample-10k-excerpt.txt");
+        return paragraph.repeat(TestRules.TWO_MB / paragraph.length() + 1).substring(0, TestRules.TWO_MB);
     }
 
     private static FindingPayload toPayload(Finding finding) {

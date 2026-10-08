@@ -66,3 +66,67 @@
   the Node mock server in `frontend/mock/`, 188 passing tests in `frontend/test/` (including the
   end-to-end and XSS tests), `frontend/README.md`, and this note.
 - Fixed by hand: nothing; retrying 502/503/504 during polling was requested after the Compose run and done by the agent
+
+## Wave 3
+
+### Done
+- W3-05 (late poll response overwrote the progress line of the filing on screen):
+  - `js/polling.js`: `pollUntil` checks cancellation again after every request, before `onValue` and
+    `isDone`, so a response that arrives after cancellation is dropped. An error thrown by a request of
+    a cancelled flow is dropped too (outcome `CANCELLED`). `runAnalysisFlow` takes an `AbortSignal`
+    (`signal`), passes it to every request and to the sleep, and treats an aborted signal as cancelled.
+    `realSleep(ms, signal)` wakes up at once on abort.
+  - `js/api.js`: `getFiling` and `getReport` take `{ signal }` and pass it to `fetch`. An aborted
+    request becomes `ApiError` with kind `aborted`, not a network error, so it is never retried.
+  - New `js/flow-session.js` (no DOM): `createLatestOnly()` hands out a token per flow (a generation
+    number plus an `AbortController`); starting a new flow aborts the previous one.
+    `createFlowSession` checks the token before every view update (status line, outcome, error, report,
+    list refresh). `js/app.js` only wires the session to the DOM.
+- Switching edge cases:
+  - opening a recent filing while another flow runs: the old flow is aborted and nothing it receives
+    later reaches the screen (status, outcome, error or report);
+  - submitting twice quickly: a second submit while the first POST is in flight is ignored (the button
+    is also disabled). Starting a submit stops the flow on screen and shows "Submitting the filing…".
+    The POST itself is never aborted, because it has a side effect;
+  - opening another filing while a submit is in flight: the accepted filing is not followed, the form
+    still says it was accepted, and the list is refreshed so it can be opened;
+  - a report for a filing no longer shown is never rendered;
+  - concurrent refreshes of the recent filings list: only the latest response is rendered.
+- CSP readiness for `Content-Security-Policy: default-src 'self'`: `index.html` has one external module
+  script and one local stylesheet, no inline script, no `<style>`, no `style=` attributes and no event
+  handler attributes; `styles.css` loads nothing; the JS has no `eval`, no `new Function`, no string
+  timers and sets no style attribute. Nothing had to change. `test/csp.test.js` enforces this, and
+  also checks that its own patterns catch each forbidden construct. The mock now sends the same header
+  for the UI files, so a manual check against the mock runs under the policy.
+- Tests: 218 in `frontend/test/` (188 before Wave 3).
+  - `test/cancellation.test.js` (11): late status, late terminal status, late report, signal passed to
+    every request, abort stops polling, aborted request means cancelled, real `fetch` aborted through
+    the API client, `aborted` error kind, `realSleep` abort. All 11 fail on the code at `main`.
+  - `test/flow-session.test.js` (10): switching filings with late status, late terminal status, late
+    report and late error; double submit; submit while a flow runs; opening a filing while a submit is
+    in flight; submit failure. With the polling fix reverted and the token check removed (the old
+    `followFiling` behaviour), 6 of the 10 fail; the other 4 cover submit rules that did not exist.
+  - `test/e2e.test.js`: two overlapping flows against the mock. The first filing's status request is
+    held, the second filing is submitted, and the held response is released after the first filing has
+    become FAILED. The UI log after the switch shows only the second filing (no failure text, no
+    "Stopped waiting", one report for the second filing). It fails on the old polling code and also
+    with the token check removed.
+  - `test/csp.test.js` (8): the CSP checks above.
+
+### Known issues and limitations
+- The headless browser check under the CSP header was not run in this session; the policy is enforced
+  by the static test and by the mock header.
+- `js/app.js` still has no automated test, but its logic moved to `js/flow-session.js`, which is tested.
+
+### How to verify
+- `node --test frontend/test/` prints `tests 218`, `pass 218`, `fail 0`.
+- `node frontend/mock/server.js`, submit the sample, then open another filing from the list while the
+  first is analysing: the progress line only ever shows the filing that was opened last.
+
+### AI record
+- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Asked for: the W3-05 fix with airtight cancellation (generation token or AbortController, in-flight
+  requests aborted), CSP readiness with a static test, the switching edge cases, unit tests that fail
+  on the old code, and an e2e test with two overlapping flows against the mock.
+- Received: the changes and tests above, and this section.
+- Fixed by hand: nothing

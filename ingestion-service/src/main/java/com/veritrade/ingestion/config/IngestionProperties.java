@@ -1,6 +1,7 @@
 package com.veritrade.ingestion.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
@@ -30,11 +31,20 @@ public record IngestionProperties(
     public record CorrelationIdLimits(@Positive int maxLength) {
     }
 
-    /** The publisher sends at most {@code batchSize} rows per query and waits {@code confirmTimeout} per confirm. */
+    /**
+     * The publisher sends at most {@code batchSize} rows per query and waits {@code confirmTimeout} per confirm.
+     * After a failed run it waits {@code retryBackoff}, multiplied by {@code retryBackoffMultiplier} after each
+     * further failed run up to {@code maxRetryBackoff}. A row that fails {@code maxAttempts} times on its own
+     * (not because of the broker) is parked.
+     */
     public record Outbox(
             boolean enabled,
             @NotNull Duration publishInterval,
             @Positive int batchSize,
-            @NotNull Duration confirmTimeout) {
+            @NotNull Duration confirmTimeout,
+            @Positive int maxAttempts,
+            @NotNull Duration retryBackoff,
+            @DecimalMin("1.0") double retryBackoffMultiplier,
+            @NotNull Duration maxRetryBackoff) {
     }
 }

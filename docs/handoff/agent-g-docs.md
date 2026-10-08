@@ -152,6 +152,72 @@ Branch `agent/docs-w2b`, from `integration/wave2` (Agent F's suite and my Wave 2
   the 663 and 132 counts come from Agent F's handoff and the orchestrator.
 - No placeholders are left in the README.
 
+## Wave 3
+Branch `agent/docs-w3`, from `integration/wave3` (the Wave 3 fixes of Agents A, B, D and E merged).
+Everything was checked against the merged code and configuration; where an agent's handoff note and
+the code differ, the docs follow the code.
+
+### Done
+- README:
+  - Quick start: addresses on `127.0.0.1`; a new "Configuration" subsection with `BIND_ADDRESS`,
+    the ports and the credentials, and the rule of `credentials-guard.sh` (weak password: `WARNING` on
+    loopback, `ERROR` and no start elsewhere); the curl examples use `127.0.0.1`; the correlation id
+    rule (strict ASCII token `[A-Za-z0-9._:-]`, 1-128, otherwise a generated UUID, never 400).
+  - Tests: real counts (see below) with a per-module table; new integration test topics (parking,
+    outage counts nothing, event versions, reason limit); frontend flow session, overlapping flows and
+    `csp.test.js`; the new smoke checks (security headers, published ports, credentials guard);
+    chaos (b) fast-503 probe; the E2E harness and loopback default; scenario rows 5, 7, 8, 15 and 17
+    updated, rows 19 (`PublishedPortsE2E`) and 20 (`HardWrappedFilingE2E`) added.
+  - Decisions table: ADRs 0011-0014.
+  - Resilience: the broker-down row (outbox back-off 1 s to 10 s, 2 s connection timeout in all three
+    services); nginx fast 503 (`proxy_connect_timeout 2s`, `resolver valid=5s`); event versioning and
+    text limits linked to `docs/contracts/messaging-topology.md`, not repeated; the Analysis failure
+    paths and the DLQ table; a new subsection "Outbox rows that can never be published"; the
+    `__TypeId__` lesson (Ingestion now has no converter at all); the H2 lesson (Analysis also has the
+    2 s timeout).
+  - Overall risk level: `rulesVersion` 1.1 and whitespace-tolerant matching (`[\h\v]+`, NBSP).
+  - Production: a replay tool for parked outbox rows. AI tools: the Wave 3 row is no longer "planned".
+  - Known limitations: removed "no CSP" and "first request hangs about 20 s"; replaced the
+    `eventVersion` item; added the parked row (filing stays `SUBMITTED`, no replay tool), the confirm
+    channel per refused message, the back-off delay, no UI authentication, the fixed weak-password
+    list, the untested headless CSP check, the flow tokens, and the hyphen broken by a line break.
+- `docs/architecture.md`: published ports on `BIND_ADDRESS`; event versioning and text limits (linked);
+  the converter paragraph; the reason limit; the poison paths; the status change through
+  `FilingStatus.transitionTo` and a versioned JPQL update without the content; the outbox diagram
+  redrawn with back-off and parking; the Analysis engine (whitespace tolerance, excerpt and matched
+  text limits); the correlation id rule; a new "RabbitMQ image" subsection; nginx timeouts, fast 503
+  and the CSP.
+- ADRs: new 0011 (park poison outbox rows), 0012 (replace an invalid correlation id), 0013 (loopback
+  by default and the broker password guard), 0014 (dead-letter an unsupported event version or an
+  over-long text). "Update (Wave 3)" sections in 0004, 0006 and 0010.
+
+### Known issues and limitations
+- `docs/handoff/agent-b-analysis.md` says `rulesVersion` stays `"1.0"`, but the merged code has
+  `"1.1"` (commit "Bump rulesVersion to 1.1 for whitespace-tolerant matching", together with the
+  contract example). The docs say 1.1. That note is not mine to change.
+- The Compose stack, `scripts/smoke.sh` and `scripts/chaos.sh` were not run by me; their behaviour is
+  documented from the scripts and Agent E's handoff (including the 2 s and about 15 s timings).
+- The headless-browser check under the CSP was not run by anyone (Agent D's note).
+
+### How to verify
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B verify` (with `DOCKER_HOST`
+  pointing at the colima socket): BUILD SUCCESS, 840 tests: contracts 29; Ingestion 327 + 26 IT;
+  Analysis 286 + 18 IT; Reporting 137 + 17 IT.
+- `./mvnw -B -Pe2e verify -pl e2e-tests -am`: BUILD SUCCESS, 144 tests in 14 classes, 4:16 min; the
+  stack was removed afterwards.
+- `node --test frontend/test/` (Node 22.23.2): `tests 218`, `pass 218`, `fail 0`.
+- `python3 -m unittest discover -s scripts/tests`: 7 tests, OK.
+- Link check (script in my scratchpad, not in the repository) over `README.md`,
+  `docs/architecture.md`, `docs/decisions/*.md` and this note: 0 broken links (anchors included).
+
+### AI record
+- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Asked for: make the README, the architecture document and the ADRs match the merged Wave 3 code,
+  with every statement checked against the code, real test counts, ADRs only for real Wave 3
+  decisions, and links to the contract rules instead of copies.
+- Received: the changes above in three commits, plus this section.
+- Fixed by hand: nothing; the orchestrator updated the `rulesVersion` note in the Analysis handoff that this agent reported as stale.
+
 ## AI record
 - Raw record: exported by the orchestrator from its session (subagent transcript)
 - Asked for: Wave 2 Agent G. That meant the README per PLAN.md section 10, `docs/architecture.md`

@@ -3,18 +3,21 @@ package com.veritrade.ingestion.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.veritrade.ingestion.domain.Filing;
+import com.veritrade.ingestion.domain.FilingState;
 import com.veritrade.ingestion.domain.FilingStatus;
 import com.veritrade.ingestion.domain.FilingView;
 import com.veritrade.ingestion.domain.OutboxEvent;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.Limit;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Runs against the Flyway schema (Hibernate validates the mapping against it). The pooled data source
@@ -35,6 +38,9 @@ class RepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Test
     void listsNewestFirstAndRespectsTheLimit() {
@@ -63,12 +69,49 @@ class RepositoryTest {
     @Test
     void readsTheViewOfOneFiling() {
         Filing filing = save(T0);
-        filing.changeStatus(FilingStatus.FAILED, "rule engine error", T0.plusSeconds(5));
+        filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "rule engine error", T0.plusSeconds(5));
         flushAndClear();
 
         assertThat(filings.findViewById(filing.id())).contains(
                 new FilingView(filing.id(), "Acme", "10-K", FilingStatus.FAILED, T0, "rule engine error"));
         assertThat(filings.findViewById(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void readsTheStateOfOneFilingWithItsVersion() {
+        Filing filing = save(T0);
+
+        assertThat(filings.findStateById(filing.id())).contains(new FilingState(filing.id(), FilingStatus.SUBMITTED, 0L));
+        assertThat(filings.findStateById(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void changesTheStatusAndIncrementsTheVersion() {
+        Filing filing = save(T0);
+        flushAndClear();
+
+        int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(5));
+
+        assertThat(changed).isEqualTo(1);
+        Filing loaded = filings.findById(filing.id()).orElseThrow();
+        assertThat(loaded.status()).isEqualTo(FilingStatus.FAILED);
+        assertThat(loaded.failureReason()).isEqualTo("boom");
+        assertThat(loaded.updatedAt()).isEqualTo(T0.plusSeconds(5));
+        assertThat(loaded.content()).isEqualTo("text");
+        assertThat(filings.findStateById(filing.id()).orElseThrow().version()).isEqualTo(1L);
+    }
+
+    @Test
+    void doesNotChangeTheStatusWithAStaleVersion() {
+        Filing filing = save(T0);
+        filings.changeStatus(filing.id(), 0L, FilingStatus.ANALYZING, null, T0.plusSeconds(1));
+
+        int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(2));
+
+        assertThat(changed).isZero();
+        assertThat(filings.findStateById(filing.id()).orElseThrow())
+                .isEqualTo(new FilingState(filing.id(), FilingStatus.ANALYZING, 1L));
+        assertThat(filings.changeStatus(UUID.randomUUID(), 0L, FilingStatus.FAILED, "x", T0)).isZero();
     }
 
     @Test
@@ -87,8 +130,8 @@ class RepositoryTest {
         String company = "\uD83D\uDE00".repeat(100);
         String title = "\uD83D\uDE00".repeat(150);
         Filing filing = filings.save(Filing.submit(UUID.randomUUID(), company, title, "text", T0));
-        filing.changeStatus(FilingStatus.FAILED, "\uD83D\uDE00".repeat(500), T0);
         flushAndClear();
+        filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "\uD83D\uDE00".repeat(500), T0);
 
         Filing loaded = filings.findById(filing.id()).orElseThrow();
         assertThat(loaded.companyName()).isEqualTo(company).hasSize(200);
@@ -103,11 +146,56 @@ class RepositoryTest {
         OutboxEvent published = saveEvent(T0.plusSeconds(1));
         outbox.markPublished(published.id(), T0.plusSeconds(3));
 
-        List<OutboxEvent> batch = outbox.findByPublishedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(10));
+        List<OutboxEvent> batch = outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(10));
 
         assertThat(batch).extracting(OutboxEvent::id).containsExactly(older.id(), newer.id());
-        assertThat(outbox.findByPublishedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(1)))
+        assertThat(outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(1)))
                 .extracting(OutboxEvent::id).containsExactly(older.id());
+    }
+
+    @Test
+    void leavesParkedEventsOutOfTheBatchAndKeepsTheOrderOfTheOthers() {
+        OutboxEvent first = saveEvent(T0);
+        OutboxEvent parked = saveEvent(T0.plusSeconds(1));
+        OutboxEvent last = saveEvent(T0.plusSeconds(2));
+        outbox.recordFailedAttempt(parked.id(), "boom");
+        outbox.parkIfExhausted(parked.id(), 1, T0.plusSeconds(3));
+
+        assertThat(outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(10)))
+                .extracting(OutboxEvent::id).containsExactly(first.id(), last.id());
+    }
+
+    @Test
+    void countsFailedAttemptsAndParksOnlyAtTheMaximum() {
+        OutboxEvent event = saveEvent(T0);
+
+        outbox.recordFailedAttempt(event.id(), "first");
+        int parkedTooEarly = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(1));
+        outbox.recordFailedAttempt(event.id(), "second");
+        int parked = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(2));
+
+        assertThat(parkedTooEarly).isZero();
+        assertThat(parked).isEqualTo(1);
+        assertThat(outboxColumns(event.id())).containsEntry("ATTEMPTS", 2).containsEntry("LAST_ERROR", "second");
+        assertThat(outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(3))).as("parked only once").isZero();
+        assertThat(outbox.recordFailedAttempt(event.id(), "after parking")).as("a parked row is not counted").isZero();
+    }
+
+    @Test
+    void doesNotCountOrParkAPublishedEvent() {
+        OutboxEvent event = saveEvent(T0);
+        outbox.markPublished(event.id(), T0.plusSeconds(1));
+
+        assertThat(outbox.recordFailedAttempt(event.id(), "late")).isZero();
+        assertThat(outbox.parkIfExhausted(event.id(), 0, T0.plusSeconds(2))).isZero();
+    }
+
+    @Test
+    void anEventStartsWithNoAttemptsAndUnparked() {
+        OutboxEvent event = saveEvent(T0);
+
+        assertThat(outboxColumns(event.id())).containsEntry("ATTEMPTS", 0).containsEntry("LAST_ERROR", null)
+                .containsEntry("PARKED_AT", null);
     }
 
     @Test
@@ -133,6 +221,10 @@ class RepositoryTest {
         OutboxEvent event = outbox.save(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "corr", "{}", createdAt));
         outbox.flush();
         return event;
+    }
+
+    private Map<String, Object> outboxColumns(UUID id) {
+        return jdbc.queryForMap("select attempts, last_error, parked_at from outbox where id = ?", id);
     }
 
     private void flushAndClear() {

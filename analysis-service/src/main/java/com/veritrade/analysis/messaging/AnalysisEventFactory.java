@@ -22,13 +22,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnalysisEventFactory {
 
-    /** Maximum length of {@code reason} in the analysis-failed schema. */
-    static final int MAX_REASON_LENGTH = 1000;
-
     private final Clock clock;
+    private final int maxReasonLength;
 
-    public AnalysisEventFactory(Clock clock) {
+    public AnalysisEventFactory(Clock clock, MessagingProperties properties) {
         this.clock = clock;
+        this.maxReasonLength = properties.maxReasonLength();
     }
 
     public EventEnvelope<AnalysisStartedPayload> started(UUID filingId, String correlationId) {
@@ -63,7 +62,15 @@ public class AnalysisEventFactory {
                 finding.matchedText(), finding.excerpt(), finding.position());
     }
 
-    private static String limit(String reason) {
-        return reason.length() <= MAX_REASON_LENGTH ? reason : reason.substring(0, MAX_REASON_LENGTH);
+    /** Cuts the reason to the limit in UTF-16 code units; a surrogate pair at the cut is dropped whole. */
+    private String limit(String reason) {
+        if (reason.length() <= maxReasonLength) {
+            return reason;
+        }
+        int end = maxReasonLength;
+        if (Character.isHighSurrogate(reason.charAt(end - 1)) && Character.isLowSurrogate(reason.charAt(end))) {
+            end--;
+        }
+        return reason.substring(0, end);
     }
 }

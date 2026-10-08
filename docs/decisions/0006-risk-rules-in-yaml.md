@@ -22,3 +22,11 @@ The rules should still be easy to read, review and extend without a code change.
 - A rule change still needs a redeploy. The file is on the classpath; its location can be changed
   with `veritrade.analysis.rules.location`.
 - Keyword and regex matching is simple and explainable. It is not semantic analysis.
+
+## Update (Wave 3)
+- A space in a pattern now means "any run of whitespace": `RuleLoader` rewrites every run of literal
+  spaces outside a character class into `[\h\v]+`, which also matches line breaks, tabs and the
+  no-break space. A space inside `[...]` or `\Q...\E` is rejected at startup. The text is not
+  normalised, so positions and excerpts still point into the original content.
+- Because matching finds more, `rulesVersion` went from `"1.0"` to `"1.1"`, together with the contract
+  example `analysis-completed.json`.

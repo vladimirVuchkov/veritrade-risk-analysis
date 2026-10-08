@@ -98,3 +98,94 @@
   279 tests, and two findings for the orchestrator (the H2 2.4.240 CHECK constraint bug, and code
   points vs UTF-16 units in the contract).
 - Fixed by hand: orchestrator reordered two statements in `OutboxPublishingIT` (bind the recovery queue before removing the rejecting one) to remove a race seen in the merged build; the `__TypeId__` listener bug found by `chaos.sh` was sent back and fixed by the agent
+
+# Wave 3 - review fixes
+
+Branch `agent/ingestion-w3`, based on `main` at 0201723.
+
+## Done
+- **W3-01 (a) correlation id.** `CorrelationIdFilter` keeps a client `X-Correlation-Id` only when it is a
+  strict token: 1 to 128 characters from `[A-Za-z0-9._:-]`, after surrounding whitespace is stripped.
+  Anything else (empty, blank, over 128, non-ASCII, control characters, inner spaces, other punctuation)
+  is **replaced with a generated UUID**; the request is never rejected for it.
+  - Why replace and not 400: the OpenAPI declares the header as an optional `string` with `maxLength: 128`
+    and no pattern, so a 400 for a schema-valid value (such as `é`) would break the contract, and `GET`
+    operations declare no 400 at all. Replacing matches the existing rule for a missing or too long id.
+    The envelope schema (`correlationId`: string, 1..128) accepts every generated or kept value.
+  - An ASCII token is at most 128 bytes, so it always fits the AMQP short string (255 bytes).
+- **W3-01 (b) poison outbox row.** Migration `V2__outbox_attempts.sql` adds `attempts` (default 0),
+  `last_error` and `parked_at` to `outbox` (only defaulted or nullable columns).
+  - The rule (`PublishFailures`): a failure counts against the row only when the message is refused
+    while it is built or encoded, before anything reaches the broker: an `IllegalArgumentException`
+    anywhere in the cause chain (the AMQP client's encoding checks, e.g. a short string over 255 bytes),
+    or a `MessageConversionException`. Connection, I/O, timeout, authentication and channel-limit
+    failures never count, even with an `IllegalArgumentException` among their causes (a broken broker
+    address would fail every row). Nor do any other `AmqpException`, a nack, a return as unroutable
+    (Analysis not up yet) or a missing confirm.
+  - A counted failure stops the run (order is kept while attempts remain). After
+    `ingestion.outbox.max-attempts` (default 5) the row is parked: `parked_at` is set, an ERROR line names
+    the event, it is never sent again, and the run continues with the next rows. Each row is the only
+    event of its filing, so skipping it reorders nothing.
+- **W3-07 load.**
+  - After a run that stops early the publisher skips runs for an exponential back-off
+    (`ingestion.outbox.retry-backoff` 1 s, `retry-backoff-multiplier` 2, `max-retry-backoff` 10 s),
+    reset by the next successful run. A long outage no longer reloads up to 40 MB every 500 ms, and
+    logs a few lines per 10 s instead of 2 per second.
+  - `FilingStatusService` reads a `FilingState` projection (id, status, version) and writes the change
+    with a JPQL update that checks and increments `version`, so a status event never loads the 2 MB
+    content. A concurrent change gives `OptimisticLockingFailureException`, which the listener retries.
+    The transition rule moved from `Filing.changeStatus` to `FilingStatus.transitionTo`.
+- **W3-08.** The unused `jsonTemplateConverter` customizer is gone; the template keeps Spring AMQP's
+  default converter and the publisher sends prebuilt messages. `RabbitConfigTest` asserts that
+  `RabbitConfig` declares no converter and no template customizer; `AnalysisEventsIT` still asserts that
+  the listener container has no JSON converter (and now also the template).
+- **Event versioning.** `AnalysisEventReader` rejects an `eventVersion` above
+  `EventEnvelope.CURRENT_VERSION` with `InvalidEventException`, so it goes to `.dlq` without retries.
+- **Text limits.** An `analysis.failed` reason over 1000 UTF-16 units goes to `.dlq` without retries.
+  The old truncation in `FilingStatusService` is removed.
+
+## Known issues and limitations
+- A parked row leaves its filing `SUBMITTED`. Parked rows are listed with
+  `select id, attempts, last_error, parked_at from outbox where parked_at is not null`; there is no
+  automatic retry or UI for them.
+- When the AMQP client refuses a message, the confirm channel it used keeps a confirm that never
+  arrives, so Spring does not return it to the cache. That is at most `max-attempts` channels per
+  parked row, freed when the connection closes.
+- An `UncategorizedAmqpException` without an `IllegalArgumentException` cause is treated as transient,
+  so a still unknown kind of poison message would block the outbox as before. This is deliberate: an
+  unproven row fault must not reorder or drop rows during an outage.
+- The back-off delays the first publish after a broker or Analysis outage by up to 10 s.
+
+## How to verify
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B -q -pl ingestion-service -am verify`
+- Unit tests:
+  - `CorrelationIdFilterTest`: the 128/129 limits, empty, non-ASCII (including the exact Tomcat-decoded
+    review input), control characters, spaces, punctuation.
+  - `OutboxPublisherTest`: message faults are counted, a parked row is skipped and later rows go on in
+    order, eight kinds of broker failure and four confirm outcomes count nothing, back-off timing and reset.
+  - `OutboxServiceTest`, `RepositoryTest`: counting, parking at exactly the maximum, the batch query.
+  - `FilingStatusServiceTest`, `FilingStatusSqlTest`: the SQL Hibernate prepares for every kind of
+    status event never mentions `content` (on the real Flyway schema).
+  - `AnalysisEventReaderTest`: version and reason limits.
+- `OutboxPublishingIT` (real RabbitMQ):
+  - the review's header is replaced and the filing is published;
+  - a poison row is parked after exactly 3 attempts, and the next filing waits for that, then is published;
+  - `rabbitmqctl stop_app` (outage) counts and parks nothing, and both filings arrive in order after `start_app`;
+  - unroutable and nack keep `attempts` at 0.
+- `AnalysisEventsIT`: a newer `eventVersion` and a 1001-unit reason are dead-lettered without retries
+  and not applied; a reason of exactly 1000 units is stored whole.
+- E2E (not run by the agent): `CorrelationIdE2E.nonAsciiCorrelationIdIsReplacedAndDoesNotBlockLaterFilings`
+  and `correlationIdThatIsNotAStrictTokenIsReplacedByAGeneratedOne`.
+  `ControlledAnalysisEventsE2E.higherEventVersionIsDeadLetteredByIngestionAndReporting` replaces the old
+  test that pinned "Ingestion applies a newer version", and
+  `failureReasonOverTheUtf16LimitIsDeadLetteredByIngestion` is new.
+- Every new regression test was run against the old behaviour and failed. The filter, `RabbitConfig`
+  and the status service were restored to their earlier versions; the reader and outbox checks were
+  disabled in place.
+
+## AI record
+- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Asked for: the Wave 3 review fixes for Ingestion (W3-01 a and b, W3-07, W3-08) and the two contract
+  decisions (event versioning, text limits), each with regression tests that fail on the old code.
+- Received: the fixes above, the V2 migration, unit tests, integration tests and E2E tests.
+- Fixed by hand: nothing; the branch merged without conflicts and passed the orchestrator's own run.

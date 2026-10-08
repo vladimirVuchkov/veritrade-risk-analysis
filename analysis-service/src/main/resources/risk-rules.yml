@@ -3,10 +3,16 @@
 # Each rule has an id (upper-case prefix, '-', three digits), a category, a severity and one or more
 # Java regular expressions. Patterns are matched case-insensitively. Write them in single quotes so
 # backslashes stay literal; a single quote inside a pattern is written twice ('').
+# A space in a pattern means "any run of whitespace": the loader turns every run of literal spaces
+# into [\h\v]+, so a phrase still matches when a hard-wrapped filing breaks it with a line break
+# (LF or CRLF), a tab, several spaces or a no-break space (U+00A0 and the other Unicode spaces).
+# A quantified space (' ?') becomes an optional run. A space inside a character class or \Q...\E is
+# rejected: write (?:-| ) instead of [- ]. An escaped space ('\ ') still matches exactly one space, and
+# an explicit \s keeps Java's meaning (ASCII whitespace only, not U+00A0).
 # The service validates this file at startup and refuses to start if anything is wrong.
 # Change rulesVersion whenever a rule changes: it is reported with every analysis result.
 
-rulesVersion: "1.0"
+rulesVersion: "1.1"
 
 rules:
   # FINANCIAL
@@ -96,7 +102,7 @@ rules:
     category: OPERATIONAL
     severity: MEDIUM
     patterns:
-      - '(?:single|sole)[- ]source suppliers?'
+      - '(?:single|sole)(?:-| )source suppliers?'
       - 'limited number of suppliers'
   - id: OPS-003
     category: OPERATIONAL
@@ -121,7 +127,7 @@ rules:
     category: CYBERSECURITY
     severity: HIGH
     patterns:
-      - 'cyber(?:security)?[- ]?(?:incidents?|attacks?)'
+      - 'cyber(?:security)?(?:-| )?(?:incidents?|attacks?)'
       - 'ransomware(?: attacks?)?'
   - id: CYBER-002
     category: CYBERSECURITY
@@ -135,7 +141,7 @@ rules:
     patterns:
       - '\bphishing\b'
       - '\bmalware\b'
-      - 'denial[- ]of[- ]service'
+      - 'denial(?:-| )of(?:-| )service'
   - id: CYBER-004
     category: CYBERSECURITY
     severity: LOW

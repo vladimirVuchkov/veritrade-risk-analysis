@@ -12,6 +12,7 @@ export const MOCK_DEFAULTS = Object.freeze({
   maxCorrelationIdLength: 128,
   defaultListLimit: 20,
   unavailableReportRequests: 0,
+  contentSecurityPolicy: "default-src 'self'",
   rulesVersion: 'mock-1.0',
   markers: Object.freeze({
     fail: '[fail]',

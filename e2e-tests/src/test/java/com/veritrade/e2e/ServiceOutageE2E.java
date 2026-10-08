@@ -14,7 +14,9 @@ import com.veritrade.e2e.support.E2ETestBase;
 import com.veritrade.e2e.support.FilingRequest;
 import com.veritrade.e2e.support.ReportAssertions;
 import com.veritrade.e2e.support.Timeouts;
+import com.veritrade.e2e.support.UpstreamProbe;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -48,12 +50,14 @@ class ServiceOutageE2E extends E2ETestBase {
 
     @Test
     void reportIsUnavailableWhileReportingIsDownAndAppearsAfterItRestarts() {
-        stack.stop(ComposeStack.REPORTING);
+        UUID unknownReport = UUID.randomUUID();
+        stopAndAssertFastServiceUnavailable(ComposeStack.REPORTING, () -> api.report(unknownReport));
         FilingRequest filing = system.demoFiling();
         UUID filingId = api.submitAccepted(filing);
 
         api.awaitStatus(filingId, "COMPLETED");
-        awaitServiceUnavailable(() -> api.report(filingId));
+        ApiResponse report = api.report(filingId);
+        assertThat(report.isProblem(SERVICE_UNAVAILABLE)).as(report.toString()).isTrue();
         awaitQueueDepthAtLeast(Q_REPORTING_ANALYSIS_RESULTS, 1);
         stack.start(ComposeStack.REPORTING);
 
@@ -66,9 +70,7 @@ class ServiceOutageE2E extends E2ETestBase {
         FilingRequest filing = system.demoFiling();
         UUID filingId = api.submitAccepted(filing);
         system.awaitLogLine(ComposeStack.INGESTION, "Published event " + submittedEventId(filingId));
-        stack.stop(ComposeStack.INGESTION);
-
-        awaitServiceUnavailable(() -> api.filing(filingId));
+        stopAndAssertFastServiceUnavailable(ComposeStack.INGESTION, () -> api.filing(filingId));
         stack.start(ComposeStack.ANALYSIS);
         ReportAssertions.assertConsistentCompletedReport(api.awaitReport(filingId), filing.content());
         awaitQueueDepthAtLeast(Q_INGESTION_ANALYSIS_EVENTS, ANALYSIS_EVENTS_PER_FILING);
@@ -121,13 +123,32 @@ class ServiceOutageE2E extends E2ETestBase {
     }
 
     /**
-     * nginx answers 503 problem+json for a stopped upstream. Right after the stop it may still try the
-     * cached address of the old container for a while (see the handoff note), so the request is retried.
+     * Stops the service while a probe sends the request every 200 ms, and keeps probing until nginx's
+     * cached address of the old container has expired. Every answer, also those that reach nginx while it
+     * still holds that address, arrives within {@link Timeouts#UPSTREAM_UNAVAILABLE} (nginx's connect
+     * timeout is 2 s), and every request sent after the stop is a 503 problem+json. No retry.
      */
-    private static void awaitServiceUnavailable(Supplier<ApiResponse> request) {
-        await("503 problem+json").atMost(Timeouts.UPSTREAM_GONE).pollInterval(Timeouts.POLL_INTERVAL)
-                .ignoreExceptionsInstanceOf(UncheckedIOException.class)
-                .until(() -> request.get().isProblem(SERVICE_UNAVAILABLE));
+    private static void stopAndAssertFastServiceUnavailable(String service, Supplier<ApiResponse> request) {
+        List<UpstreamProbe.Result> results;
+        long stoppedAt;
+        try (UpstreamProbe probe = UpstreamProbe.start(request)) {
+            stack.stop(service);
+            stoppedAt = System.nanoTime();
+            long cacheExpired = stoppedAt + Timeouts.UPSTREAM_ADDRESS_CACHE.toNanos();
+            await("probes beyond nginx's cached upstream address")
+                    .atMost(Timeouts.UPSTREAM_ADDRESS_CACHE.plus(Timeouts.HTTP_REQUEST))
+                    .pollInterval(Timeouts.POLL_INTERVAL)
+                    .until(() -> probe.hasResultStartedAfter(cacheExpired));
+            results = probe.finish();
+        }
+
+        assertThat(results).as("every answer across the stop").allSatisfy(result -> {
+            assertThat(result.error()).as(result.toString()).isNull();
+            assertThat(result.elapsed()).as(result.toString()).isLessThan(Timeouts.UPSTREAM_UNAVAILABLE);
+        });
+        assertThat(results).filteredOn(result -> result.startedNanos() - stoppedAt >= 0)
+                .as("answers after the stop").isNotEmpty()
+                .allSatisfy(result -> assertThat(result.isProblem(SERVICE_UNAVAILABLE)).as(result.toString()).isTrue());
     }
 
     private static void awaitQueueDepthAtLeast(String queue, int messages) {

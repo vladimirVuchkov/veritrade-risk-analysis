@@ -5,6 +5,7 @@ import com.veritrade.ingestion.config.IngestionProperties;
 import com.veritrade.ingestion.domain.OutboxEvent;
 import com.veritrade.ingestion.repository.OutboxRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -14,7 +15,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Stores events in the outbox table and tracks which of them reached the broker. */
+/**
+ * Stores events in the outbox table and tracks which of them reached the broker, and which of them
+ * failed so often on their own that they are parked.
+ */
 @Service
 public class OutboxService {
 
@@ -22,12 +26,14 @@ public class OutboxService {
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final int batchSize;
+    private final int maxAttempts;
 
     public OutboxService(OutboxRepository outbox, JsonMapper jsonMapper, Clock clock, IngestionProperties properties) {
         this.outbox = outbox;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
         this.batchSize = properties.outbox().batchSize();
+        this.maxAttempts = properties.outbox().maxAttempts();
     }
 
     /** Must run inside the transaction that changes the business data, so both commit or neither does. */
@@ -40,11 +46,33 @@ public class OutboxService {
 
     @Transactional(readOnly = true)
     public List<OutboxEvent> nextBatch() {
-        return outbox.findByPublishedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(batchSize));
+        return outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(batchSize));
     }
 
     @Transactional
     public void markPublished(UUID eventId) {
-        outbox.markPublished(eventId, clock.instant().truncatedTo(ChronoUnit.MICROS));
+        outbox.markPublished(eventId, now());
+    }
+
+    /**
+     * Counts a failure of the row itself (never a broker outage) and parks the row once it has failed
+     * {@code ingestion.outbox.max-attempts} times. Returns true when the row is parked now.
+     */
+    @Transactional
+    public boolean recordFailedAttempt(UUID eventId, String error) {
+        outbox.recordFailedAttempt(eventId, shorten(error));
+        return outbox.parkIfExhausted(eventId, maxAttempts, now()) == 1;
+    }
+
+    public int maxAttempts() {
+        return maxAttempts;
+    }
+
+    private Instant now() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private static String shorten(String error) {
+        return error.length() <= OutboxEvent.LAST_ERROR_LENGTH ? error : error.substring(0, OutboxEvent.LAST_ERROR_LENGTH);
     }
 }

@@ -204,7 +204,10 @@ async function serveStatic(req, res, url, root) {
   try {
     const body = await readFile(file);
     const type = MIME_TYPES[extname(file)] || MIME_TYPES['.html'];
-    res.writeHead(STATUS.ok, { 'Content-Type': type });
+    res.writeHead(STATUS.ok, {
+      'Content-Type': type,
+      'Content-Security-Policy': MOCK_DEFAULTS.contentSecurityPolicy,
+    });
     res.end(req.method === 'HEAD' ? undefined : body);
   } catch {
     sendHtmlError(res, STATUS.notFound, 'Not Found');

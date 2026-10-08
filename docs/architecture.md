@@ -27,16 +27,18 @@ flowchart LR
 
 | Component | Port | Published to the host | State |
 |---|---|---|---|
-| Frontend (nginx) | 8080 | yes | none |
+| Frontend (nginx) | 8080 | yes, on `BIND_ADDRESS` | none |
 | Ingestion | 8081 | no | H2 file `ingestion` (`filings`, `outbox`) |
 | Analysis | 8082 (health only) | no | none |
 | Reporting | 8083 | no | H2 file `reporting` (`reports`, `findings`, `processed_events`) |
-| RabbitMQ | 5672 (AMQP), 15672 (management) | management only | durable queues (volume `rabbitmq-data`) |
+| RabbitMQ | 5672 (AMQP), 15672 (management) | management only, on `BIND_ADDRESS` | durable queues (volume `rabbitmq-data`) |
 
 The H2 files live in the volumes `ingestion-data` and `reporting-data`. The two published host ports
 can be changed with `UI_PORT` and `RABBITMQ_MANAGEMENT_PORT` in `.env` (see
-[`.env.example`](../.env.example)). All containers share one Compose network, `backend`. How the
-containers are built and what nginx does is in [section 12](#12-containers-and-nginx).
+[`.env.example`](../.env.example)). Both are bound to `BIND_ADDRESS`, default `127.0.0.1`, so they are
+reachable only from the host itself ([ADR 0013](decisions/0013-loopback-ports-and-broker-password-guard.md)).
+All containers share one Compose network, `backend`. How the containers are built and what nginx does
+is in [section 12](#12-containers-and-nginx).
 
 Responsibilities:
 
@@ -57,7 +59,10 @@ Analysis the rule engine (`engine/`) is pure Java as well.
 ## 2. Events
 
 Every event uses the same envelope: `eventId`, `eventType`, `eventVersion` (1), `occurredAt`,
-`correlationId` and `payload`. The schemas are in [`contracts/`](contracts/).
+`correlationId` and `payload`. The schemas are in [`contracts/`](contracts/). Every consumer
+dead-letters an `eventVersion` above 1 and a text over its limit in UTF-16 units, without retries; the
+rules are in [`messaging-topology.md`](contracts/messaging-topology.md), sections "Event versioning"
+and "Text limits" ([ADR 0014](decisions/0014-dead-letter-unsupported-event-versions.md)).
 
 | Routing key | `eventType` | Producer | Payload |
 |---|---|---|---|
@@ -71,9 +76,10 @@ AMQP properties on every message: `messageId` = `eventId`, `contentType` = `appl
 `mandatory = true` and wait for the publisher confirm.
 
 Consumers dispatch on the envelope's `eventType`, never on Spring's `__TypeId__` header, which
-`JacksonJsonMessageConverter` adds. Analysis and Ingestion therefore put their JSON converter only on
-the `RabbitTemplate` and not on the listener container, so their listeners read the raw message;
-Reporting has no converter bean. Earlier, the converter was a bean, the listener container converted
+`JacksonJsonMessageConverter` adds. No listener container has a JSON converter, so every listener
+reads the raw message. Analysis puts its JSON converter only on the `RabbitTemplate`; Ingestion (whose
+outbox sends prebuilt messages) and Reporting declare no converter at all. Earlier, the converter was a
+bean, the listener container converted
 by `__TypeId__`, and valid events were dead-lettered or failed. Only runs against the real stack
 found this (see the [README](../README.md#the-__typeid__-header)).
 
@@ -128,7 +134,8 @@ retries, and gives up only after more than 3 such errors in a row.
 A processing error (for example an exception in the analyzer, or a publish that is not confirmed) is
 retried by the Spring AMQP listener retry: 3 attempts, 1 s initial interval, multiplier 2, at most
 5 s. After the last attempt `FailedAnalysisRecoverer` publishes `analysis.failed` and the original
-message is acknowledged.
+message is acknowledged. The reason is cut to 1000 UTF-16 units
+(`veritrade.analysis.messaging.max-reason-length`) without splitting a surrogate pair.
 
 ```mermaid
 sequenceDiagram
@@ -174,7 +181,7 @@ sequenceDiagram
     participant DLX as veritrade.dlx
     participant DLQ as analysis.filing-submitted.dlq
 
-    MQ->>A: filing.submitted (invalid JSON, missing field, wrong eventType)
+    MQ->>A: filing.submitted (invalid JSON, missing field, wrong eventType, eventVersion above 1)
     A->>A: FilingSubmittedReader throws InvalidFilingMessageException
     Note over A: retry policy skips this exception
     A-->>MQ: reject, requeue = false
@@ -185,8 +192,9 @@ sequenceDiagram
 
 The same applies in the other consumers:
 
-- **Ingestion** dead-letters an unreadable event, an unknown `eventType`, a missing `filingId` or
-  `reason`, and an event for an unknown filing.
+- **Ingestion** dead-letters an unreadable event, an unknown `eventType`, an `eventVersion` above 1, a
+  missing `filingId` or `reason`, a `reason` over 1000 UTF-16 units, and an event for an unknown
+  filing.
 - **Reporting** dead-letters an unreadable event, an unknown or misrouted `eventType`, missing fields,
   values outside the schema limits, an unknown enum value and an `eventVersion` above 1.
 
@@ -229,8 +237,11 @@ How each consumer detects repeats:
 
 ## 7. Filing status
 
-Ingestion owns the status. `Filing.changeStatus` returns `APPLIED`, `DUPLICATE` or `REJECTED`. It
-never throws for a valid filing.
+Ingestion owns the status. `FilingStatus.transitionTo` returns `APPLIED`, `DUPLICATE` or `REJECTED`.
+It never throws for a valid filing. `FilingStatusService` reads only the id, status and version of the
+filing (`FilingState`) and writes an applied change with a JPQL update that checks and increments
+`version`, so a status event never loads the up to 2 MB content. A concurrent change gives an
+`OptimisticLockingFailureException`, and the listener retry reads the filing again.
 
 ```mermaid
 stateDiagram-v2
@@ -254,14 +265,21 @@ stateDiagram-v2
 flowchart TD
     submit["FilingService.submit"] --> tx["One transaction:<br/>insert filing + insert outbox row"]
     tx --> wait(["OutboxPublisher, fixed delay 500 ms"])
-    wait --> batch["Read up to 20 rows with published_at NULL,<br/>ordered by created_at, id"]
+    wait --> paused{"In back-off?"}
+    paused -- yes --> wait
+    paused -- no --> batch["Read up to 20 rows with published_at NULL<br/>and parked_at NULL, ordered by created_at, id"]
     batch --> any{"Row left?"}
-    any -- no --> wait
+    any -- "no: run succeeded,<br/>reset back-off" --> wait
     any -- yes --> send["rabbitTemplate.send<br/>mandatory, messageId = eventId,<br/>CorrelationData = row id"]
-    send --> confirm{"Confirm within 5 s?"}
+    send --> refused{"Refused before<br/>the broker?"}
+    refused -- "yes: attempts + 1" --> limit{"attempts =<br/>max-attempts (5)?"}
+    limit -- yes --> park["Set parked_at, ERROR log"]
+    park --> any
+    limit -- no --> stop
+    refused -- no --> confirm{"Confirm within 5 s?"}
     confirm -- "ack, not returned" --> mark["Set published_at"]
     mark --> any
-    confirm -- "nack / returned / timeout / AmqpException" --> stop["Stop this run<br/>(row stays unpublished, order kept)"]
+    confirm -- "nack / returned / timeout / broker failure" --> stop["Stop this run<br/>(row stays unpublished, order kept),<br/>back-off 1 s, 2 s, ... up to 10 s"]
     stop --> wait
 ```
 
@@ -270,6 +288,17 @@ flowchart TD
   queue is bound yet. That happens when Analysis has not declared its queue; the row is sent again
   later.
 - The publisher stops at the first failure, so later rows never overtake an earlier one.
+- Only a failure of the row itself counts against it: the AMQP client refuses the message before it
+  reaches the broker (an `IllegalArgumentException` in the cause chain or a
+  `MessageConversionException`, see `PublishFailures`). After `ingestion.outbox.max-attempts`
+  (default 5) such failures the row is parked and the run goes on with the next rows. Connection, I/O,
+  timeout, authentication and channel-limit failures, nacks, returns and missing confirms never count,
+  so a broker outage parks nothing ([ADR 0011](decisions/0011-park-poison-outbox-rows.md)).
+- After a run that stops early, the next runs are skipped for an exponential back-off
+  (`ingestion.outbox.retry-backoff` 1 s, `retry-backoff-multiplier` 2, `max-retry-backoff` 10 s). The
+  next successful run resets it.
+- `attempts`, `last_error` and `parked_at` come from the migration `V2__outbox_attempts.sql`. A parked
+  row leaves its filing `SUBMITTED`; there is no replay tool.
 - After a restart, the unpublished rows are still in the H2 file and are sent on the first run.
 - A lost confirm sends the row again with the same `messageId`; consumers drop the repeat.
 - Only one instance may run the publisher (`ingestion.outbox.enabled=false` turns it off).
@@ -314,7 +343,7 @@ The full definition is in [`contracts/messaging-topology.md`](contracts/messagin
 flowchart LR
     L["FilingSubmittedListener"] --> RA["RiskAnalyzer"]
     RA --> RM["RuleMatcher<br/>rules from RuleLoader"]
-    RA --> EX["ExcerptExtractor<br/>±120 characters"]
+    RA --> EX["ExcerptExtractor<br/>±120 characters, at most 1000"]
     RA --> SC["RiskScorer"]
     SC --> RES["AnalysisResult"]
     RES --> F["AnalysisEventFactory"] --> P["AnalysisEventPublisher"]
@@ -322,9 +351,18 @@ flowchart LR
 
 - `RuleLoader` reads `risk-rules.yml` at startup and validates it. The service does not start when
   the file is invalid.
+- Whitespace-tolerant patterns (`rulesVersion` 1.1): before compiling, `RuleLoader` passes every
+  pattern through `WhitespaceTolerance`, which turns each run of literal spaces outside a character
+  class into `[\h\v]+` (one or more horizontal or vertical whitespace characters, including U+00A0)
+  and a quantified space into an optional run. A space inside `[...]` or `\Q...\E` is rejected. The
+  text is never normalised, so positions and excerpts refer to the original content.
 - `RuleMatcher` matches case-insensitively. Overlapping matches of one rule are merged (the earlier
   match wins, and the longer one wins at the same start). Each rule keeps at most 50 matches
-  (`max-matches-per-rule`). A matched text is cut to 500 characters.
+  (`max-matches-per-rule`). A matched text is cut to 500 UTF-16 units (`max-matched-text-chars`, at
+  most 500).
+- `ExcerptExtractor` takes up to 120 characters of context on each side (`excerpt-context-chars`),
+  never splits a surrogate pair, and keeps the whole excerpt within `max-excerpt-chars` (default 1000,
+  between `max-matched-text-chars` and 1000): for a long match the context shrinks.
 - `position` is the zero-based UTF-16 offset of the match. Findings are sorted by position, then by
   rule id.
 - `RiskScorer` computes the overall risk level:
@@ -339,9 +377,12 @@ All limits are set in `veritrade.analysis.rules.*` (`RulesProperties`).
 
 - `GET /actuator/health` on every service, used by the container health checks. nginx has its own
   `/healthz`.
-- Ingestion takes the `X-Correlation-Id` request header, or generates an id, and returns it in the
-  response. The id travels in the envelope and in the AMQP `correlationId`, and every log line shows
-  it (`[%X{correlationId}]`).
+- Ingestion takes the `X-Correlation-Id` request header when it is a strict ASCII token (1 to 128
+  characters from `[A-Za-z0-9._:-]`, after surrounding whitespace is stripped). Otherwise, and when the
+  header is missing, it generates a UUID; it never rejects the request for it
+  ([ADR 0012](decisions/0012-replace-invalid-correlation-ids.md)). It returns the id in the response.
+  The id travels in the envelope and in the AMQP `correlationId`, and every log line shows it
+  (`[%X{correlationId}]`).
 - nginx writes the `X-Correlation-Id` request header into its access log (`cid="..."`), next to the
   upstream address and the request time.
 
@@ -351,6 +392,17 @@ The stack is defined in [`docker-compose.yml`](../docker-compose.yml): RabbitMQ,
 and nginx. Every container has a health check, and `depends_on: condition: service_healthy` orders the
 start: the Java services wait for RabbitMQ, and nginx waits for Ingestion and Reporting. Services
 restart `unless-stopped`.
+
+### RabbitMQ image
+
+[`infra/docker/rabbitmq.Dockerfile`](../infra/docker/rabbitmq.Dockerfile) builds on
+`rabbitmq:4.3-management-alpine` and puts
+[`infra/rabbitmq/credentials-guard.sh`](../infra/rabbitmq/credentials-guard.sh) in front of the
+official entrypoint. Compose passes `BIND_ADDRESS` to it as `VERITRADE_BIND_ADDRESS`. A known weak
+password (`veritrade`, `change-me`, `guest`, empty) is accepted only on a loopback address (`127.*`,
+`::1`, `localhost`) and logs a `WARNING`; on any other address the container exits with an `ERROR`.
+`credentials-guard.sh check` runs only the check; `scripts/smoke.sh` uses it
+([ADR 0013](decisions/0013-loopback-ports-and-broker-password-guard.md)).
 
 ### One Dockerfile for the Java services
 
@@ -382,12 +434,20 @@ build:
   `reporting-service:8083`, with the full URI (`/api` is not stripped). Any other `/api/` path is a
   404 `application/problem+json`.
 - **Upstreams are resolved per request.** `proxy_pass` uses variables and the resolver is Docker's
-  DNS (`127.0.0.11`, valid 10 s). nginx therefore starts even when a service is down, and it follows a
-  restarted container to its new address.
+  DNS (`127.0.0.11`, `valid=5s`, `resolver_timeout 2s`). nginx therefore starts even when a service is
+  down, and it follows a restarted container to its new address within 5 s.
+- **Fast 503 for a stopped service.** A stopped container's name stops resolving at once, which gives
+  503 in milliseconds. While nginx still holds the cached address (at most 5 s), a connect to it never
+  answers, so `proxy_connect_timeout 2s` cuts it short: the client gets the 503 within about 2 s
+  instead of after about 15 s. `proxy_send_timeout` and `proxy_read_timeout` are 30 s.
 - **Errors are problem+json.** An upstream 502, 503 or 504 (a stopped or unreachable service) becomes
   `503 application/problem+json`. A body over 3 MB becomes `413 application/problem+json`.
 - **Body size.** `client_max_body_size 3m`: a filing of 2 MB plus JSON escaping fits, and a content of
   2 MB + 1 byte reaches Ingestion, which answers 400. The nginx default of 1 MB would answer 413 first.
-- **Headers.** `X-Correlation-Id` is passed to the service and comes back in the response. Every
-  response carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`; the UI files
-  are sent with `Cache-Control: no-cache`.
+- **Headers.** `X-Correlation-Id` is passed to the service and comes back in the response.
+  [`infra/nginx/security-headers.conf`](../infra/nginx/security-headers.conf) is included at server
+  level and in `location /`, so every response, including nginx's own problem responses, carries
+  `Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self';
+  frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. The
+  UI files are also sent with `Cache-Control: no-cache`. The UI has no inline script, style or event
+  handler, so the policy needs no `'unsafe-inline'`.

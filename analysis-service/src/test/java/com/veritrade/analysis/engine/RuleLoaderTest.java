@@ -31,7 +31,7 @@ class RuleLoaderTest {
     void bundledRulesHaveAtLeastTwentyRulesCoveringEveryCategory() {
         RuleSet rules = TestRules.bundledRules();
 
-        assertThat(rules.rulesVersion()).isEqualTo("1.0");
+        assertThat(rules.rulesVersion()).isEqualTo("1.1");
         assertThat(rules.rules()).hasSizeGreaterThanOrEqualTo(20);
         assertThat(rules.rules()).extracting(RiskRule::category).contains(RiskCategory.values());
         assertThat(rules.rules()).extracting(RiskRule::severity).contains(Severity.values());
@@ -49,6 +49,14 @@ class RuleLoaderTest {
         assertThat(rule.severity()).isEqualTo(Severity.HIGH);
         assertThat(rule.patterns()).singleElement()
                 .satisfies(p -> assertThat(p.matcher("PENDING Litigation").matches()).isTrue());
+    }
+
+    @Test
+    void compilesSpacesAsWhitespaceRuns() {
+        RuleSet rules = TestRules.load("rulesVersion: \"1\"\nrules:\n" + VALID_RULE);
+
+        assertThat(rules.rules().getFirst().patterns()).singleElement()
+                .satisfies(p -> assertThat(p.matcher("Pending\r\n\tlitigation").matches()).isTrue());
     }
 
     @Test
@@ -113,6 +121,10 @@ class RuleLoaderTest {
                         "every pattern must be a non-blank string, was 42"),
                 Arguments.of("pattern matching empty text", rules(rule("LEGAL-001", "LEGAL", "LOW", "'(?:risk)?'")),
                         "pattern '(?:risk)?' matches empty text"),
+                Arguments.of("space in a character class", rules(rule("OPS-002", "OPERATIONAL", "LOW", "'sole[- ]source'")),
+                        "rule #1 (OPS-002): pattern 'sole[- ]source': a space inside a character class"),
+                Arguments.of("space in a quote", rules(rule("OPS-002", "OPERATIONAL", "LOW", "'\\Qsole source\\E'")),
+                        "pattern '\\Qsole source\\E': a space inside \\Q...\\E"),
                 Arguments.of("malformed rule id", rules(rule("legal-1", "LEGAL", "LOW", "'x1'")),
                         "'id' must look like LEGAL-001"),
                 Arguments.of("missing rule id", rules("""

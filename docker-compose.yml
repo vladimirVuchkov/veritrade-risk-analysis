@@ -1,7 +1,13 @@
 name: veritrade
 
-# Only the UI (nginx) and the RabbitMQ management UI are published to the host.
-# The services talk to each other on the single "backend" network.
+# Only the UI (nginx) and the RabbitMQ management UI are published to the host, and only on
+# BIND_ADDRESS (default 127.0.0.1, loopback). The services talk to each other on the single "backend"
+# network.
+#
+# Credentials: without a .env the broker user is veritrade/veritrade, so `docker compose up --build`
+# works with no manual step. That known password is accepted only on a loopback BIND_ADDRESS: the
+# rabbitmq container then logs a WARNING, and it refuses to start when BIND_ADDRESS is any other
+# address (see infra/rabbitmq/credentials-guard.sh). Set RABBITMQ_PASSWORD in .env to publish elsewhere.
 
 x-java-healthcheck: &java-healthcheck
   interval: 10s
@@ -25,14 +31,17 @@ x-rabbit-env: &rabbit-env
 
 services:
   rabbitmq:
-    image: rabbitmq:4.3-management-alpine
+    build:
+      context: infra/rabbitmq
+      dockerfile: ../docker/rabbitmq.Dockerfile
     restart: unless-stopped
     hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-veritrade}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-veritrade}
+      VERITRADE_BIND_ADDRESS: ${BIND_ADDRESS:-127.0.0.1}
     ports:
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "${BIND_ADDRESS:-127.0.0.1}:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -98,7 +107,7 @@ services:
       dockerfile: infra/docker/frontend.Dockerfile
     restart: unless-stopped
     ports:
-      - "${UI_PORT:-8080}:8080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${UI_PORT:-8080}:8080"
     depends_on:
       ingestion-service:
         condition: service_healthy

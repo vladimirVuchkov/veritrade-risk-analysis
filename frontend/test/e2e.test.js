@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { ApiError, createApiClient, ERROR_KINDS } from '../js/api.js';
 import { CATEGORIES, CONFIG } from '../js/config.js';
+import { createFlowSession } from '../js/flow-session.js';
 import { describeOutcome, problemMessage } from '../js/format.js';
 import { OUTCOMES, realSleep, runAnalysisFlow } from '../js/polling.js';
 import { renderFilingsList, renderReport } from '../js/render.js';
@@ -248,9 +249,96 @@ describe('end to end against the mock server', () => {
     const index = await fetch(`${baseUrl}/`);
     assert.equal(index.status, 200);
     assert.match(await index.text(), /VeriTrade Risk Analysis/);
+    assert.equal(index.headers.get('content-security-policy'), "default-src 'self'");
     const script = await fetch(`${baseUrl}/js/app.js`);
     assert.match(script.headers.get('content-type'), /javascript/);
     assert.equal((await fetch(`${baseUrl}/missing.css`)).status, 404);
+  });
+});
+
+describe('end to end with two overlapping flows', () => {
+  const server = createMockServer({ timings: TIMINGS });
+  let baseUrl;
+
+  before(async () => {
+    baseUrl = await listen(server);
+  });
+
+  after(() => new Promise((resolveClose) => {
+    server.closeAllConnections();
+    server.close(resolveClose);
+  }));
+
+  function holdFirstStatusRequest(filingId) {
+    let release;
+    const gate = new Promise((resolveGate) => {
+      release = resolveGate;
+    });
+    const held = { issued: null, signal: null, release };
+    let markIssued;
+    held.issued = new Promise((resolveIssued) => {
+      markIssued = resolveIssued;
+    });
+    let used = false;
+    const fetchFn = async (url, init) => {
+      if (used || !url.endsWith(`/api/filings/${filingId}`)) return fetch(url, init);
+      used = true;
+      held.signal = init.signal;
+      markIssued();
+      await gate;
+      return fetch(url, { ...init, signal: undefined });
+    };
+    return { fetchFn, held };
+  }
+
+  function recordingView() {
+    const log = [];
+    return {
+      log,
+      view: {
+        progress: (tone, message) => log.push({ kind: 'progress', tone, message }),
+        clearProgress: () => log.push({ kind: 'clearProgress' }),
+        clearReport: () => log.push({ kind: 'clearReport' }),
+        report: (report) => log.push({ kind: 'report', filingId: report.filingId }),
+        settled: () => log.push({ kind: 'settled' }),
+      },
+    };
+  }
+
+  it('shows only the second filing when a slow response for the first arrives late', async () => {
+    const plainApi = createApiClient({ fetchFn: fetch, baseUrl });
+    const first = await plainApi.submitFiling({ ...SAMPLE_FILING, title: `First ${MOCK_DEFAULTS.markers.fail}` });
+    const firstCreated = Date.now();
+    const { fetchFn, held } = holdFirstStatusRequest(first.filingId);
+    const { log, view } = recordingView();
+    const session = createFlowSession({
+      api: createApiClient({ fetchFn, baseUrl }), view, settings: SETTINGS, sleep: realSleep,
+    });
+
+    const firstFlow = session.follow(first.filingId);
+    await held.issued;
+    await realSleep(TIMINGS.submittedMs + TIMINGS.analyzingMs / 2);
+    const secondStartedAt = log.length;
+    const { accepted: second, flow: secondFlow } = await session.submit(SAMPLE_FILING);
+    assert.equal(held.signal.aborted, true, 'the first flow request should be aborted');
+
+    await realSleep(Math.max(0, firstCreated + TIMINGS.submittedMs + TIMINGS.analyzingMs + 10 - Date.now()));
+    assert.equal((await plainApi.getFiling(first.filingId)).status, 'FAILED');
+    assert.notEqual((await plainApi.getFiling(second.filingId)).status, 'COMPLETED');
+    held.release();
+    await firstFlow;
+    await secondFlow;
+
+    const shown = log.slice(secondStartedAt);
+    const text = JSON.stringify(shown);
+    assert.doesNotMatch(text, /failed/i, text);
+    assert.ok(!text.includes(MOCK_DEFAULTS.failureReason));
+    assert.ok(!text.includes(describeOutcome({ outcome: OUTCOMES.cancelled }).message), text);
+    assert.deepEqual(shown.filter((entry) => entry.kind === 'report'), [{ kind: 'report', filingId: second.filingId }]);
+    const lastProgress = shown.filter((entry) => entry.kind === 'progress').at(-1);
+    assert.equal(lastProgress.message, describeOutcome({ outcome: OUTCOMES.completed }).message);
+    assert.deepEqual(shown.at(-1), { kind: 'settled' });
+    assert.equal(shown.filter((entry) => entry.kind === 'settled').length, 1);
   });
 });
 

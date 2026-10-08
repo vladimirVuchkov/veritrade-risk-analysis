@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -17,7 +18,15 @@ final class TestRules {
     static final int DEFAULT_CAP = 50;
     static final int DEFAULT_CONTEXT = 120;
     static final int DEFAULT_MAX_MATCH = 500;
+    static final int DEFAULT_MAX_EXCERPT = 1000;
     static final int DEFAULT_THRESHOLD = 10;
+    static final int TWO_MB = 2 * 1024 * 1024;
+    /**
+     * Wall-clock limit for analysing 2 MB. About 1 s on a laptop and about 50 s even with the JIT
+     * compiler turned off ({@code -Xint}), so a slow or busy CI runner never fails it. It only stops a
+     * runaway match; {@link CountingText} checks the complexity independently of the machine.
+     */
+    static final Duration GENEROUS_TIME_LIMIT = Duration.ofSeconds(60);
 
     private TestRules() {
     }
@@ -41,7 +50,7 @@ final class TestRules {
 
     static RiskAnalyzer analyzer(RuleSet rules) {
         return new RiskAnalyzer(rules, new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH),
-                new ExcerptExtractor(DEFAULT_CONTEXT), new RiskScorer(DEFAULT_THRESHOLD));
+                new ExcerptExtractor(DEFAULT_CONTEXT, DEFAULT_MAX_EXCERPT), new RiskScorer(DEFAULT_THRESHOLD));
     }
 
     static RiskAnalyzer bundledAnalyzer() {

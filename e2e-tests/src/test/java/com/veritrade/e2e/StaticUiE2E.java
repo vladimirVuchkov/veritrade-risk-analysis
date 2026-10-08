@@ -14,12 +14,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Scenario 17: the UI served by nginx (MIME types, hidden files, security headers). */
+/** Scenario 17: the UI served by nginx (MIME types, hidden files, security headers including the CSP). */
 class StaticUiE2E extends E2ETestBase {
 
     private static final int OK = 200;
     private static final int FORBIDDEN = 403;
     private static final int NOT_FOUND = 404;
+    private static final String CONTENT_SECURITY_POLICY =
+            "default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
     @Test
     void rootServesIndexHtmlWithTheStaticSecurityHeaders() {
@@ -29,6 +31,17 @@ class StaticUiE2E extends E2ETestBase {
         assertThat(response.contentType()).startsWith("text/html");
         assertThat(response.body()).contains("<script type=\"module\"");
         assertStaticHeaders(response);
+    }
+
+    @Test
+    void indexHtmlNeedsNoInlineScriptOrStyleSoTheContentSecurityPolicyHolds() {
+        String html = api.get("/").body();
+
+        assertThat(html).doesNotContainPattern("<script(?![^>]*\\bsrc=)[^>]*>")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)\\sstyle=")
+                .doesNotContainPattern("(?i)\\son[a-z]+=")
+                .doesNotContain("javascript:");
     }
 
     @ParameterizedTest
@@ -75,8 +88,14 @@ class StaticUiE2E extends E2ETestBase {
     void apiResponsesCarryTheServerWideSecurityHeaders() {
         ApiResponse response = api.get("/api/filings?limit=1");
 
-        assertThat(response.header("X-Content-Type-Options")).hasValue("nosniff");
-        assertThat(response.header("Referrer-Policy")).hasValue("no-referrer");
+        assertSecurityHeaders(response);
+    }
+
+    @Test
+    void problemResponsesOfNginxCarryTheServerWideSecurityHeaders() {
+        ApiResponse response = api.get("/api/unknown");
+
+        assertSecurityHeaders(response);
     }
 
     @Test
@@ -103,8 +122,13 @@ class StaticUiE2E extends E2ETestBase {
     }
 
     private static void assertStaticHeaders(ApiResponse response) {
+        assertSecurityHeaders(response);
+        assertThat(response.header("Cache-Control")).hasValue("no-cache");
+    }
+
+    private static void assertSecurityHeaders(ApiResponse response) {
+        assertThat(response.header("Content-Security-Policy")).hasValue(CONTENT_SECURITY_POLICY);
         assertThat(response.header("X-Content-Type-Options")).hasValue("nosniff");
         assertThat(response.header("Referrer-Policy")).hasValue("no-referrer");
-        assertThat(response.header("Cache-Control")).hasValue("no-cache");
     }
 }

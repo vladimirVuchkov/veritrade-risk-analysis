@@ -24,3 +24,14 @@ backend APIs.
   it starts without them and follows a restarted container, and it answers a stopped service with
   `503 application/problem+json`. The UI retries 502, 503 and 504 a limited number of times. The
   configuration is [`infra/nginx/default.conf`](../../infra/nginx/default.conf).
+
+## Update (Wave 3)
+- Both published ports are bound to `127.0.0.1` by default
+  ([ADR 0013](0013-loopback-ports-and-broker-password-guard.md)).
+- nginx sends a Content-Security-Policy on every response, including its own problem responses
+  ([`infra/nginx/security-headers.conf`](../../infra/nginx/security-headers.conf)):
+  `default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+  without `'unsafe-inline'`. The plain HTML/JS UI needed no change for it: it has no inline script,
+  style or event handler and uses no `eval`.
+- `proxy_connect_timeout 2s` and `resolver ... valid=5s` make a stopped service answer 503 within
+  about 2 s.

@@ -7,9 +7,12 @@ import com.veritrade.e2e.support.ApiResponse;
 import com.veritrade.e2e.support.ComposeStack;
 import com.veritrade.e2e.support.E2ETestBase;
 import com.veritrade.e2e.support.FilingRequest;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Scenario 5: X-Correlation-Id from the HTTP request through every service and back. */
 class CorrelationIdE2E extends E2ETestBase {
@@ -62,6 +65,36 @@ class CorrelationIdE2E extends E2ETestBase {
                 Map.of(Api.CORRELATION_HEADER, atLimit));
 
         assertThat(response.header(Api.CORRELATION_HEADER)).hasValue(atLimit);
+    }
+
+    /**
+     * Review W3-01: 64 "é" sent as raw UTF-8 are 128 characters for Tomcat but 256 bytes in UTF-8, over the
+     * AMQP short-string limit. Before the fix the outbox retried that row forever and every later filing stayed
+     * SUBMITTED. Now the id is replaced, and this filing and the next one both complete.
+     */
+    @Test
+    void nonAsciiCorrelationIdIsReplacedAndDoesNotBlockLaterFilings() {
+        String rawUtf8 = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+
+        ApiResponse response = api.submit(FilingRequest.noRisk("Non-ASCII correlation id").toJson(),
+                Map.of(Api.CORRELATION_HEADER, rawUtf8));
+        UUID next = api.submitAccepted(FilingRequest.noRisk("Filing after a non-ASCII correlation id"));
+
+        String generated = response.header(Api.CORRELATION_HEADER).orElseThrow();
+        assertThat(UUID.fromString(generated)).isNotNull();
+        UUID filingId = UUID.fromString(response.json().path("filingId").asString());
+        api.awaitStatus(filingId, "COMPLETED");
+        api.awaitStatus(next, "COMPLETED");
+        system.awaitLogLine(ComposeStack.INGESTION, generated, "Published event");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"has inner spaces", "slash/and;semicolon", "quote\"d"})
+    void correlationIdThatIsNotAStrictTokenIsReplacedByAGeneratedOne(String header) {
+        ApiResponse response = api.submit(FilingRequest.noRisk("Correlation id not a token").toJson(),
+                Map.of(Api.CORRELATION_HEADER, header));
+
+        assertThat(UUID.fromString(response.header(Api.CORRELATION_HEADER).orElseThrow())).isNotNull();
     }
 
     @Test

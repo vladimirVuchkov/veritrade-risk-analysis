@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * The repository's docker-compose.yml, run through the docker compose CLI under its own project name.
  * Both published ports are random host ports, so the suite never collides with another stack on
- * 8080 or 15672. The CLI (rather than a Testcontainers wrapper) is used because the scenarios stop and
+ * 8080 or 15672. They are bound to the docker-compose.yml default address (loopback). The CLI (rather than a Testcontainers wrapper) is used because the scenarios stop and
  * start single services, read their logs and look up ports again after a container restart.
  */
 public final class ComposeStack implements AutoCloseable {
@@ -36,6 +36,9 @@ public final class ComposeStack implements AutoCloseable {
     private static final String PROJECT_PREFIX = "veritrade-e2e-";
     private static final int PROJECT_SUFFIX_BYTES = 4;
     private static final String RANDOM_HOST_PORT = "0";
+    private static final List<String> WILDCARD_ADDRESSES = List.of("0.0.0.0", "[::]", "::");
+    /** Removed from the environment, so the stack is published on the docker-compose.yml default (loopback). */
+    private static final String BIND_ADDRESS_VARIABLE = "BIND_ADDRESS";
 
     private final Path repositoryRoot;
     private final String project;
@@ -91,9 +94,16 @@ public final class ComposeStack implements AutoCloseable {
 
     /** The host address of a published container port; it changes when the container is recreated or restarted. */
     public URI endpoint(String service, int containerPort) {
-        String binding = compose(Timeouts.COMPOSE_COMMAND, "port", service, String.valueOf(containerPort)).strip();
-        String hostPort = binding.substring(binding.lastIndexOf(':') + 1);
-        return URI.create("http://localhost:" + hostPort);
+        String binding = binding(service, containerPort);
+        int separator = binding.lastIndexOf(':');
+        String host = binding.substring(0, separator);
+        String reachableHost = WILDCARD_ADDRESSES.contains(host) ? "localhost" : host;
+        return URI.create("http://" + reachableHost + ":" + binding.substring(separator + 1));
+    }
+
+    /** What {@code docker compose port} prints for a published container port, for example {@code 127.0.0.1:49153}. */
+    public String binding(String service, int containerPort) {
+        return compose(Timeouts.COMPOSE_COMMAND, "port", service, String.valueOf(containerPort)).strip();
     }
 
     @Override
@@ -113,6 +123,7 @@ public final class ComposeStack implements AutoCloseable {
     private String run(List<String> command, Duration timeout) {
         ProcessBuilder builder = new ProcessBuilder(command).directory(repositoryRoot.toFile()).redirectErrorStream(true);
         builder.environment().putAll(Map.of("UI_PORT", RANDOM_HOST_PORT, "RABBITMQ_MANAGEMENT_PORT", RANDOM_HOST_PORT));
+        builder.environment().remove(BIND_ADDRESS_VARIABLE);
         try {
             Process process = builder.start();
             CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> readAll(process.getInputStream()));

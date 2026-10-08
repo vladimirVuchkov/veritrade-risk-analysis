@@ -18,6 +18,7 @@ import com.veritrade.ingestion.service.FilingNotFoundException;
 import com.veritrade.ingestion.service.FilingStatusService;
 import com.veritrade.ingestion.service.StatusUpdate;
 import com.veritrade.ingestion.support.Contracts;
+import com.veritrade.ingestion.support.TestProperties;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,7 +36,7 @@ class AnalysisEventListenerTest {
 
     private final FilingStatusService statusService = mock(FilingStatusService.class);
     private final AnalysisEventListener listener =
-            new AnalysisEventListener(new AnalysisEventReader(JsonMapper.builder().build()), statusService);
+            new AnalysisEventListener(new AnalysisEventReader(JsonMapper.builder().build(), TestProperties.defaults()), statusService);
 
     @AfterEach
     void clearMdc() {

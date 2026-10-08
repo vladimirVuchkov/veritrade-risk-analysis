@@ -5,6 +5,7 @@
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY infra/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY frontend/index.html frontend/styles.css /usr/share/nginx/html/
 COPY frontend/js/ /usr/share/nginx/html/js/
 EXPOSE 8080

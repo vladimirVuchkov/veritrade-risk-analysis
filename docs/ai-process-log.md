@@ -88,6 +88,25 @@ _Entries are collected from the handoff notes in `handoff/`._
 
 ### W3 - Review and delivery
 
+#### [4] 2026-10-08 - Wave 3 - Orchestrator with agents A, B, D, E and G
+- **Goal:** fix the findings of the independent review (W3-01 to W3-09) and the contract questions left open in Wave 2, each with a regression test that fails on the old code, then bring the documentation in line with the merged code.
+- **Tool and model:** Claude Code (Claude Opus 5.5); orchestrator session with one subagent per owner in its own git worktree, two agents running at a time.
+- **Given to the AI:** per agent, its review findings, the two contract decisions recorded in `messaging-topology.md` ("Event versioning", "Text limits") and the rule that every fix comes with a test proven to fail without it. Raw record: exported by the orchestrator from its session (subagent transcripts included). Details: the Wave 3 sections of the notes in [`handoff/`](handoff/).
+- **Received:**
+  - Ingestion: correlation id accepted only as a strict ASCII token, otherwise replaced; outbox rows that the AMQP client refuses are parked after a bounded number of attempts (V2 migration) while broker failures never count; exponential back-off of the outbox run; status changes without loading the filing content; unsupported event versions and over-long reasons dead-lettered.
+  - Analysis: whitespace-tolerant rule matching (`rulesVersion` 1.1), unsupported event versions dead-lettered without retries, the failure reason cut to 1000 UTF-16 units, excerpt limits, 2 s broker connection timeout.
+  - Frontend: a new submit cancels the polling of the previous one (flow tokens, `AbortController`); a test that the UI needs no inline script or style.
+  - Infrastructure: published ports bound to `127.0.0.1` by default (`BIND_ADDRESS`), the broker refuses a weak password on any other address, nginx answers 503 within about 2 s when a service is down, a Content-Security-Policy on every UI response.
+  - Documentation: README, architecture and ADRs 0011-0014 updated to the merged code, with real test counts.
+- **My intervention:** _to be completed_
+- **Decision:** _to be completed_
+- **Verification:** every agent branch re-verified independently by the orchestrator before the merge into `integration/wave3`; on the merged branch `./mvnw -B verify` green (840 tests: contracts 29, Ingestion 327 + 26 IT, Analysis 286 + 18 IT, Reporting 137 + 17 IT); `node --test frontend/test/` 218/218; export tool 7/7; `./mvnw -B -Pe2e verify -pl e2e-tests -am` 144/144; `docker compose up --build -d --wait` all containers healthy; `scripts/smoke.sh` passed; `scripts/chaos.sh` six of six; no denylisted term in the repository.
+- **Problems/lessons:**
+  - Raising `rulesVersion` was not in any agent's ownership (it touches the frozen contract example); the orchestrator made the bump in one commit with the example and the two tests that pin it.
+  - Agent A stopped a stuck test run with `pkill -f surefire`, which could also have killed another agent's test process; the affected build was run again. Agents are now told not to kill processes they did not start.
+  - A substring check of the denylist with `git grep -w` gave false positives inside Cyrillic words, because it treats non-ASCII letters as word boundaries; the check now uses Unicode word boundaries, like the export tool.
+  - A parked outbox row leaves its filing `SUBMITTED` and there is no replay tool yet; recorded as a known limitation.
+
 ## 3. Part of the system -> AI contribution -> my contribution
 
 | Part | AI contribution | My contribution |

@@ -115,3 +115,72 @@
   `verify` (183 unit tests and 12 integration tests). Found along the way: the Boot 4 retry property
   rename, the colima and Ryuk socket problem, and the RabbitMQ 4.3 restriction on transient queues.
 - Fixed by hand: nothing; the orchestrator copied the sample fixture to `samples/sample-10k-excerpt.txt` as requested
+
+## Wave 3 (review fixes, branch `agent/analysis-w3`)
+
+### Done
+- **W3-03, whitespace-tolerant rules.** `RuleLoader` passes every pattern through `WhitespaceTolerance`
+  before compiling it. Each run of literal spaces outside a character class becomes `[\h\v]+`: one or more
+  horizontal or vertical whitespace characters. A quantified space (`' ?'`) becomes an optional run. So
+  a phrase still matches across LF, CRLF, tabs, several spaces and a no-break space. The text itself is
+  never normalised, so `position`, `matchedText` and `excerpt` stay offsets into, and substrings of, the
+  original content. A space inside `[...]` or `\Q...\E` would match only one character, so the loader now
+  rejects it. The three `[- ]` rules (OPS-002, CYBER-001, CYBER-003) are now written as `(?:-| )`. An
+  escaped space `\ ` and an explicit `\s` keep their Java meaning. The rules file header documents all of this.
+- **NBSP decision:** a no-break space counts as whitespace. EDGAR text converted from HTML often has
+  U+00A0 between words. `\h` covers it and the other Unicode spaces (U+2000-U+200A, U+202F, U+3000),
+  and `\v` covers NEL, U+2028 and U+2029. Java's plain `\s` covers none of them unless you add
+  `UNICODE_CHARACTER_CLASS`, which would also change `\b` and slow every rule. A zero-width space
+  (U+200B) does not count as whitespace.
+- **Backtracking:** no `[\h\v]+` follows another one unless a word sits between them, so matching
+  stays linear. `CountingText` counts the characters the regex engine reads. Over 2 MB of adversarial,
+  whitespace-heavy input, all 33 rules read about 100 characters per input character (limit 500). A
+  deliberately quadratic pattern goes far above the limit even on 20 KB, which shows that the check works.
+- **W3-09:** the 2 MB test is split. `capsEveryRuleOnTwoMegabytes` keeps the functional assertions
+  without any timing. `analysesTwoMegabytesInLinearTime` checks the read count, which does not depend
+  on the machine. `analysesTwoMegabytesWithinAGenerousTimeLimit` uses `TestRules.GENEROUS_TIME_LIMIT`
+  (60 s, non-preemptive `assertTimeout`).
+- **Event versioning:** `FilingSubmittedReader` rejects `eventVersion > EventEnvelope.CURRENT_VERSION`
+  with `InvalidFilingMessageException`. The message goes to `analysis.filing-submitted.dlq` without
+  retries, and no `analysis.started` is published.
+- **Text limits:**
+  - `veritrade.analysis.messaging.max-reason-length` (default 1000; allowed range 2 to 1000) limits the
+    `analysis.failed` reason. A surrogate pair at the cut is dropped whole.
+  - `veritrade.analysis.rules.max-excerpt-chars` (default 1000) is new. `ExcerptExtractor` shrinks the
+    context for a long match, so an excerpt never exceeds the limit, even with surrogate pairs at both edges.
+  - `RulesProperties` refuses `max-matched-text-chars > 500`, and `max-excerpt-chars` outside
+    `[max-matched-text-chars, 1000]`, at startup.
+- **Broker connection timeout:** `spring.rabbitmq.connection-timeout: 2s`, plus `BrokerConnectionTimeoutTest`
+  (the same test as in Ingestion and Reporting).
+- **E2E (not run here, the orchestrator runs it):**
+  - `HardWrappedFilingE2E`: the demo filing, hard-wrapped at 72 columns, gives the same rule ids and
+    summary as the unwrapped one.
+  - `FilingSubmittedConsumerE2E.higherEventVersionOfFilingSubmittedIsDeadLetteredWithoutRetries`
+    replaces the old test that expected a version 2 filing to be analysed.
+
+### Sample findings
+- The bundled sample and the contract example give exactly the same findings as before: 26 findings, and
+  `filing-submitted.json` gives `analysis-completed.json`. They contain no broken phrases.
+- Only text with a phrase broken by whitespace gains findings. The demo filing, wrapped at 72 columns,
+  has 6 matches that span a line break. Before this fix, all of them were lost.
+
+### Known issues and limitations
+- `rulesVersion` was `"1.0"` on this branch, although matching now finds more. The orchestrator decided
+  the bump at merge: `rulesVersion` is `"1.1"`, and the contract example `analysis-completed.json` and the
+  two tests that pin the version were updated in the same commit.
+- A hyphen broken by a line break (`denial-of-\nservice`) still does not match. Only whitespace is tolerated.
+
+### How to verify
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B -q -pl analysis-service -am verify`:
+  green, 286 unit tests and 18 integration tests.
+- Regression tests: `WhitespaceToleranceTest`, `WhitespaceTolerantMatchingTest`, `RuleLoaderTest`,
+  `RiskAnalyzerTest`, `ExcerptExtractorTest`, `AnalysisEventFactoryTest`, `EngineConfigTest`,
+  `FilingSubmittedListenerTest`, `BrokerConnectionTimeoutTest`, and the ITs
+  `AnalysisFlowIT.sendsANewerEventVersionToTheDeadLetterQueueWithoutRetriesOrEvents` and
+  `AnalysisFailureIT.cutsALongReasonToTheSchemaLimitWithoutSplittingASurrogatePair`. Each one was run
+  against the old behaviour (the change reverted temporarily) and failed.
+
+### AI record
+- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Fixed by hand: the orchestrator bumped `rulesVersion` to `"1.1"` at merge (rules file, contract example,
+  `RuleLoaderTest`, `RiskAnalyzerTest`).

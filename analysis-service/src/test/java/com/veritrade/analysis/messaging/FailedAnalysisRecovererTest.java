@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.veritrade.analysis.support.TestMessages;
 import com.veritrade.contracts.event.AnalysisFailedPayload;
 import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
@@ -27,7 +28,7 @@ class FailedAnalysisRecovererTest {
 
     private final AnalysisEventPublisher publisher = mock(AnalysisEventPublisher.class);
     private final FailedAnalysisRecoverer recoverer = new FailedAnalysisRecoverer(
-            new FilingSubmittedReader(JsonMapper.builder().build()), new AnalysisEventFactory(Clock.systemUTC()), publisher);
+            new FilingSubmittedReader(JsonMapper.builder().build()), new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING), publisher);
 
     @Test
     void publishesAnalysisFailedAfterAProcessingFailureAndReturnsNormally() {
@@ -59,7 +60,7 @@ class FailedAnalysisRecovererTest {
     @Test
     void reportsAPublishFailureOfTheCompletedEventAsTheReason() {
         Message message = message(filingSubmitted(UUID.randomUUID()));
-        EventEnvelope<?> event = new AnalysisEventFactory(Clock.systemUTC()).started(UUID.randomUUID(), "c");
+        EventEnvelope<?> event = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING).started(UUID.randomUUID(), "c");
 
         recoverer.recover(message, listenerFailure(message, new EventPublishException(event, "no confirm")));
 

@@ -12,6 +12,10 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * A submitted filing. The status columns are changed only through
+ * {@code FilingRepository.changeStatus}, so a status event never loads the content.
+ */
 @Entity
 @Table(name = "filings")
 public class Filing {
@@ -60,23 +64,6 @@ public class Filing {
 
     public static Filing submit(UUID id, String companyName, String title, String content, Instant submittedAt) {
         return new Filing(id, companyName, title, content, submittedAt);
-    }
-
-    /**
-     * Moves the filing to {@code target} when the lifecycle allows it. The failure reason is kept
-     * only for {@link FilingStatus#FAILED}. A duplicate or rejected change leaves the filing untouched.
-     */
-    public StatusChange changeStatus(FilingStatus target, String reason, Instant at) {
-        if (status == target) {
-            return StatusChange.DUPLICATE;
-        }
-        if (!status.canMoveTo(target)) {
-            return StatusChange.REJECTED;
-        }
-        status = target;
-        failureReason = target == FilingStatus.FAILED ? reason : null;
-        updatedAt = at;
-        return StatusChange.APPLIED;
     }
 
     public UUID id() {

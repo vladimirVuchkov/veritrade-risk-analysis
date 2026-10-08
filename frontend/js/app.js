@@ -1,7 +1,7 @@
 import { createApiClient } from './api.js';
 import { CONFIG } from './config.js';
-import { describeContentSize, describeOutcome, describeStatus, problemMessage } from './format.js';
-import { OUTCOMES, runAnalysisFlow } from './polling.js';
+import { createFlowSession, createLatestOnly } from './flow-session.js';
+import { describeContentSize, problemMessage } from './format.js';
 import { renderFilingsList, renderMessage, renderReport } from './render.js';
 import { SAMPLE_FILING } from './sample.js';
 import { toSubmitRequest, utf8ByteLength, validateFiling, validateTextFile } from './validation.js';
@@ -27,8 +27,6 @@ const dom = {
   filings: byId('filings'),
   refreshButton: byId('refresh-filings'),
 };
-
-let activeRun = 0;
 
 function formValues() {
   const { companyName, title, content } = dom.fields;
@@ -83,35 +81,6 @@ async function handleFileChange() {
   updateContentSize();
 }
 
-function showResult(result) {
-  const { tone, message } = describeOutcome(result);
-  showProgress(tone, message);
-  if (result.outcome === OUTCOMES.completed) {
-    dom.report.replaceChildren(renderReport(doc, result.report, result.filing));
-    dom.report.focus();
-  }
-}
-
-async function followFiling(filingId) {
-  activeRun += 1;
-  const run = activeRun;
-  dom.report.replaceChildren();
-  showProgress('info', 'Checking the filing status…');
-  try {
-    const result = await runAnalysisFlow({
-      api,
-      filingId,
-      isCancelled: () => run !== activeRun,
-      onStatus: (filing) => showProgress('info', describeStatus(filing.status)),
-    });
-    if (run !== activeRun) return;
-    showResult(result);
-  } catch (error) {
-    if (run === activeRun) showProgress('error', problemMessage(error.problem));
-  }
-  refreshFilings();
-}
-
 async function handleSubmit(event) {
   event.preventDefault();
   dom.formMessage.replaceChildren();
@@ -121,9 +90,11 @@ async function handleSubmit(event) {
   if (!valid) return;
   dom.submitButton.disabled = true;
   try {
-    const accepted = await api.submitFiling(toSubmitRequest(values));
-    showFormMessage('success', 'Filing accepted for analysis.');
-    followFiling(accepted.filingId);
+    const submitted = await session.submit(toSubmitRequest(values));
+    if (submitted) {
+      showFormMessage('success', 'Filing accepted for analysis.');
+      refreshFilings();
+    }
   } catch (error) {
     showFormMessage('error', problemMessage(error.problem));
   } finally {
@@ -132,13 +103,31 @@ async function handleSubmit(event) {
 }
 
 async function refreshFilings() {
+  const token = filingsRefresh.next();
   try {
     const filings = await api.listFilings(CONFIG.ui.recentFilingsLimit);
-    dom.filings.replaceChildren(renderFilingsList(doc, filings, (filing) => followFiling(filing.filingId)));
+    if (!token.isCurrent()) return;
+    dom.filings.replaceChildren(renderFilingsList(doc, filings, (filing) => session.follow(filing.filingId)));
   } catch (error) {
+    if (!token.isCurrent()) return;
     dom.filings.replaceChildren(renderMessage(doc, { tone: 'error', message: problemMessage(error.problem) }));
   }
 }
+
+const filingsRefresh = createLatestOnly();
+const session = createFlowSession({
+  api,
+  view: {
+    progress: showProgress,
+    clearProgress: () => dom.progress.replaceChildren(),
+    clearReport: () => dom.report.replaceChildren(),
+    report: (report, filing) => {
+      dom.report.replaceChildren(renderReport(doc, report, filing));
+      dom.report.focus();
+    },
+    settled: refreshFilings,
+  },
+});
 
 dom.form.addEventListener('submit', handleSubmit);
 dom.sampleButton.addEventListener('click', loadSample);

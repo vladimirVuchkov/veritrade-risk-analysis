@@ -11,8 +11,14 @@ if [ -f "$ROOT_DIR/.env" ]; then
     set +a
 fi
 
-BASE_URL="${BASE_URL:-http://localhost:${UI_PORT:-8080}}"
-RABBIT_API="${RABBIT_API:-http://localhost:${RABBITMQ_MANAGEMENT_PORT:-15672}/api}"
+# Same defaults as docker-compose.yml. A wildcard bind address is reached through localhost.
+BIND_ADDRESS="${BIND_ADDRESS:-127.0.0.1}"
+case "$BIND_ADDRESS" in
+    0.0.0.0|::) PUBLISHED_HOST=localhost ;;
+    *)          PUBLISHED_HOST="$BIND_ADDRESS" ;;
+esac
+BASE_URL="${BASE_URL:-http://$PUBLISHED_HOST:${UI_PORT:-8080}}"
+RABBIT_API="${RABBIT_API:-http://$PUBLISHED_HOST:${RABBITMQ_MANAGEMENT_PORT:-15672}/api}"
 RABBIT_USER="${RABBITMQ_USERNAME:-veritrade}"
 RABBIT_PASS="${RABBITMQ_PASSWORD:-veritrade}"
 RABBIT_VHOST="%2F"
@@ -35,6 +41,22 @@ info() { printf '  - %s\n' "$*"; }
 ok()   { printf '  %sok%s   %s\n' "$GREEN" "$RESET" "$*"; }
 bad()  { printf '  %sFAIL%s %s\n' "$RED" "$RESET" "$*" >&2; }
 die()  { printf '%sERROR%s %s\n' "$RED" "$RESET" "$*" >&2; exit 1; }
+warn() { printf '%sWARNING%s %s\n' "$RED" "$RESET" "$*" >&2; }
+
+# The known weak passwords that infra/rabbitmq/credentials-guard.sh allows on loopback only.
+is_weak_rabbit_password() {
+    case "$RABBIT_PASS" in
+        ""|veritrade|change-me|guest) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+warn_if_weak_credentials() {
+    if is_weak_rabbit_password; then
+        warn "RabbitMQ uses a known default password (local use only, published on $BIND_ADDRESS)." \
+             "Set RABBITMQ_PASSWORD in .env for anything else."
+    fi
+}
 
 require_tools() {
     local tool
@@ -42,6 +64,9 @@ require_tools() {
         command -v "$tool" > /dev/null 2>&1 || die "'$tool' is required but not installed"
     done
 }
+
+# Runs in the repository root, so docker compose finds docker-compose.yml (or honours COMPOSE_FILE).
+compose() { (cd "$ROOT_DIR" && docker compose "$@"); }
 
 # Milliseconds since the epoch, for timings only. bash 5 has EPOCHREALTIME and GNU date has %N;
 # macOS ships bash 3.2 and BSD date, so there perl (always present) gives the milliseconds.

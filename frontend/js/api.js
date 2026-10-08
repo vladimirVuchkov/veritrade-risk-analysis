@@ -5,6 +5,7 @@ const HTTP_NOT_FOUND = 404;
 export const ERROR_KINDS = Object.freeze({
   http: 'http',
   network: 'network',
+  aborted: 'aborted',
   invalidResponse: 'invalid-response',
 });
 
@@ -66,7 +67,17 @@ async function readJson(response) {
   }
 }
 
+function abortedError(cause) {
+  const error = new ApiError({
+    kind: ERROR_KINDS.aborted,
+    problem: { title: 'Request cancelled', detail: 'The request was cancelled.' },
+  });
+  error.cause = cause;
+  return error;
+}
+
 function networkError(cause) {
+  if (cause?.name === 'AbortError') return abortedError(cause);
   const error = new ApiError({
     kind: ERROR_KINDS.network,
     problem: {
@@ -118,11 +129,11 @@ export function createApiClient({ fetchFn, baseUrl = '' }) {
       });
       return expectSuccess(response);
     },
-    async getFiling(filingId) {
-      return expectSuccess(await send(filingPath(filingId), jsonGet));
+    async getFiling(filingId, { signal } = {}) {
+      return expectSuccess(await send(filingPath(filingId), { ...jsonGet, signal }));
     },
-    async getReport(filingId) {
-      const response = await send(`${reportsPath}/${encodeURIComponent(filingId)}`, jsonGet);
+    async getReport(filingId, { signal } = {}) {
+      const response = await send(`${reportsPath}/${encodeURIComponent(filingId)}`, { ...jsonGet, signal });
       if (response.status === HTTP_NOT_FOUND) {
         return null;
       }

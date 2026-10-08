@@ -2,6 +2,7 @@ package com.veritrade.ingestion.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 class OutboxServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-07T12:00:01.987654321Z");
+    private static final Instant MICROS = Instant.parse("2026-10-07T12:00:01.987654Z");
     private static final int BATCH_SIZE = 7;
 
     private final OutboxRepository repository = mock(OutboxRepository.class);
@@ -63,7 +65,7 @@ class OutboxServiceTest {
     @Test
     void readsTheNextBatchWithTheConfiguredSize() {
         List<OutboxEvent> rows = List.of(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "c", "{}", NOW));
-        when(repository.findByPublishedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(BATCH_SIZE))).thenReturn(rows);
+        when(repository.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(BATCH_SIZE))).thenReturn(rows);
 
         assertThat(service.nextBatch()).isEqualTo(rows);
     }
@@ -74,7 +76,28 @@ class OutboxServiceTest {
 
         service.markPublished(id);
 
-        verify(repository).markPublished(id, Instant.parse("2026-10-07T12:00:01.987654Z"));
+        verify(repository).markPublished(id, MICROS);
+    }
+
+    @Test
+    void countsAFailedAttemptAndParksOnlyWhenTheMaximumIsReached() {
+        UUID id = UUID.randomUUID();
+        when(repository.parkIfExhausted(id, TestProperties.MAX_ATTEMPTS, MICROS)).thenReturn(0, 1);
+
+        assertThat(service.recordFailedAttempt(id, "IllegalArgumentException: Short string too long")).isFalse();
+        assertThat(service.recordFailedAttempt(id, "IllegalArgumentException: Short string too long")).isTrue();
+
+        verify(repository, times(2)).recordFailedAttempt(id, "IllegalArgumentException: Short string too long");
+        assertThat(service.maxAttempts()).isEqualTo(TestProperties.MAX_ATTEMPTS);
+    }
+
+    @Test
+    void cutsTheErrorToTheColumnLength() {
+        UUID id = UUID.randomUUID();
+
+        service.recordFailedAttempt(id, "e".repeat(OutboxEvent.LAST_ERROR_LENGTH + 1));
+
+        verify(repository).recordFailedAttempt(id, "e".repeat(OutboxEvent.LAST_ERROR_LENGTH));
     }
 
     private OutboxEvent savedRow() {

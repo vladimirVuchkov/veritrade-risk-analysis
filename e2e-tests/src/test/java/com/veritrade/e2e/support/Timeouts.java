@@ -27,10 +27,12 @@ public final class Timeouts {
      */
     public static final Duration MIN_RETRY_BACKOFF = Duration.ofSeconds(3);
     /**
-     * nginx caches an upstream address for 10 s and has the default 60 s connect timeout, so right after
-     * a container stops a request can hang before nginx answers 503.
+     * A stopped upstream to nginx's 503: a stopped container's name no longer resolves, and a cached
+     * address of it fails after nginx's 2 s {@code proxy_connect_timeout}. One request, no retry.
      */
-    public static final Duration UPSTREAM_GONE = Duration.ofSeconds(90);
+    public static final Duration UPSTREAM_UNAVAILABLE = Duration.ofSeconds(5);
+    /** nginx keeps a resolved upstream address for 5 s ({@code resolver ... valid=5s}), plus a margin. */
+    public static final Duration UPSTREAM_ADDRESS_CACHE = Duration.ofSeconds(7);
     public static final Duration POLL_INTERVAL = Duration.ofMillis(200);
     public static final Duration HTTP_REQUEST = Duration.ofSeconds(15);
     /** The frontend flow (Node) polls with its own short interval; this bounds the whole run. */

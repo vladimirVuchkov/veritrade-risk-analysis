@@ -3,10 +3,13 @@ package com.veritrade.ingestion.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
 import com.veritrade.ingestion.domain.FilingStatus;
 import com.veritrade.ingestion.service.StatusUpdate;
 import com.veritrade.ingestion.support.Contracts;
+import com.veritrade.ingestion.support.TestProperties;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -20,9 +23,10 @@ import tools.jackson.databind.node.ObjectNode;
 class AnalysisEventReaderTest {
 
     private static final UUID FILING_ID = UUID.fromString("3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12");
+    private static final String EMOJI = "\uD83D\uDCC8";
     private static final String CORRELATION_ID = "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20";
 
-    private final AnalysisEventReader reader = new AnalysisEventReader(JsonMapper.builder().build());
+    private final AnalysisEventReader reader = new AnalysisEventReader(JsonMapper.builder().build(), TestProperties.defaults());
 
     @Test
     void readsTheStartedExample() {
@@ -62,11 +66,31 @@ class AnalysisEventReaderTest {
     }
 
     @Test
-    void acceptsANewerEventVersion() {
+    void acceptsTheCurrentEventVersion() {
         ObjectNode event = Contracts.example(EventType.ANALYSIS_STARTED);
-        event.put("eventVersion", 2);
+        event.put("eventVersion", EventEnvelope.CURRENT_VERSION);
 
         assertThat(read(event).eventType()).isEqualTo(EventType.ANALYSIS_STARTED);
+    }
+
+    /** Contract, "Event versioning": a newer version goes to the dead-letter queue, it is not guessed at. */
+    @ParameterizedTest
+    @EnumSource(value = EventType.class, names = "FILING_SUBMITTED", mode = EnumSource.Mode.EXCLUDE)
+    void rejectsANewerEventVersionOfEveryAnalysisEvent(EventType type) {
+        assertInvalid(modified(type, e -> e.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1)),
+                "Unsupported eventVersion 2");
+    }
+
+    @Test
+    void rejectsAnEventVersionBeyondTheIntegerRange() {
+        assertInvalid(modified(EventType.ANALYSIS_STARTED, e -> e.put("eventVersion", new BigInteger("100000000000000000000"))),
+                "Unsupported eventVersion");
+    }
+
+    @Test
+    void rejectsANewerEventVersionEvenWhenThePayloadIsOtherwiseValid() {
+        assertInvalid(modified(EventType.ANALYSIS_FAILED, e -> e.put("eventVersion", Integer.MAX_VALUE)),
+                "highest supported version is 1");
     }
 
     @Test
@@ -158,6 +182,45 @@ class AnalysisEventReaderTest {
     }
 
     @Test
+    void acceptsAFailureReasonOfExactlyTheLimit() {
+        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
+
+        assertThat(read(failedWith(reason)).statusUpdate().failureReason()).isEqualTo(reason);
+    }
+
+    @Test
+    void acceptsASurrogatePairThatEndsExactlyAtTheLimit() {
+        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - EMOJI.length()) + EMOJI;
+
+        assertThat(read(failedWith(reason)).statusUpdate().failureReason()).isEqualTo(reason);
+    }
+
+    /** Contract, "Text limits": the limit counts UTF-16 units, and an over-limit text is not cut but rejected. */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 1000})
+    void rejectsAFailureReasonOverTheLimitInUtf16Units(int over) {
+        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH + over);
+
+        assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("payload.reason has " + reason.length() + " UTF-16 units; the limit is 1000");
+    }
+
+    @Test
+    void rejectsAFailureReasonOverTheLimitOnlyBecauseOfASurrogatePair() {
+        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - 1) + EMOJI;
+
+        assertThat(reason.codePointCount(0, reason.length())).isEqualTo(TestProperties.MAX_FAILURE_REASON_LENGTH);
+        assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class);
+    }
+
+    @Test
+    void rejectsAFailureReasonOfOnlyEmojiOverTheLimit() {
+        String reason = EMOJI.repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
+
+        assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class);
+    }
+
+    @Test
     void rejectsAMissingFailureReason() {
         assertInvalid(modified(EventType.ANALYSIS_FAILED,
                 e -> ((ObjectNode) e.get("payload")).remove("reason")), "reason is missing");
@@ -167,6 +230,12 @@ class AnalysisEventReaderTest {
     void rejectsACompletedEventWithAnUnknownRiskCategory() {
         assertInvalid(modified(EventType.ANALYSIS_COMPLETED,
                 e -> ((ObjectNode) e.get("payload").get("findings").get(0)).put("category", "WEATHER")), "Invalid");
+    }
+
+    private static ObjectNode failedWith(String reason) {
+        ObjectNode event = Contracts.example(EventType.ANALYSIS_FAILED);
+        ((ObjectNode) event.get("payload")).put("reason", reason);
+        return event;
     }
 
     private AnalysisEvent read(ObjectNode event) {

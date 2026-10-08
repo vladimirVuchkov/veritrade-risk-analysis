@@ -12,12 +12,13 @@ in the production stack. The UI calls the same-origin paths `/api/filings` and `
 | `js/validation.js` | required fields, lengths, 2 MB UTF-8 byte limit (`TextEncoder`) |
 | `js/api.js` | Fetch client; RFC 9457 errors become `ApiError` |
 | `js/polling.js` | status polling, then report polling until the 404 turns into a 200 |
+| `js/flow-session.js` | one flow on screen at a time: a new flow aborts the old one and drops its late updates |
 | `js/highlight.js` | splits an excerpt into plain and highlighted segments |
 | `js/format.js` | labels, CSS classes, counts and user messages |
 | `js/render.js` | DOM builders; untrusted text goes only through text nodes, never `innerHTML` |
 | `js/app.js` | DOM wiring only |
 | `js/sample.js` | the sample filing used by "Load sample" |
-| `mock/` | dependency-free mock server of the REST contract |
+| `mock/` | dependency-free mock server of the REST contract; sends `Content-Security-Policy: default-src 'self'` for the UI |
 | `test/` | unit and end-to-end tests (`node:test`) |
 
 `package.json` only marks the `.js` files as ES modules for Node. It has no dependencies.

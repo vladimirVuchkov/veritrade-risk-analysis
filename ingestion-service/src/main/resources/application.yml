@@ -68,3 +68,7 @@ ingestion:
     publish-interval: 500ms
     batch-size: 20
     confirm-timeout: 5s
+    max-attempts: 5
+    retry-backoff: 1s
+    retry-backoff-multiplier: 2
+    max-retry-backoff: 10s

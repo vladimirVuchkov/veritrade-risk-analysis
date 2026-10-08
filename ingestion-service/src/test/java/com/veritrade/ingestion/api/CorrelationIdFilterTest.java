@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,52 @@ class CorrelationIdFilterTest {
     void replacesAnIdOverTheMaximumLength() throws Exception {
         String id = "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH + 1);
 
+        assertGenerated(filter(id));
+    }
+
+    @Test
+    void keepsEveryAllowedCharacterClass() throws Exception {
+        String id = "AZaz09._:-" + "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH - 10);
+
+        assertThat(filter(id).header()).isEqualTo(id);
+    }
+
+    /**
+     * 64 "é" are 128 characters once Tomcat decodes the raw UTF-8 bytes as ISO-8859-1, but 256 bytes
+     * in UTF-8: over the 255-byte AMQP short string that carries the correlation id (review W3-01).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "\u00c3\u00a9\u00c3\u00a9\u00c3\u00a9", "\u00e9t\u00e9", "\u6ce8\u6587", "\ud83d\udcc8",
+            "abc\u00a0def", "caf\u00e9-123"})
+    void replacesANonAsciiId(String id) throws Exception {
+        assertGenerated(filter(id));
+    }
+
+    @Test
+    void replacesTheIdThatBlockedTheOutbox() throws Exception {
+        String decodedByTomcat = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+
+        assertThat(decodedByTomcat).hasSize(TestProperties.MAX_CORRELATION_ID_LENGTH);
+        assertGenerated(filter(decodedByTomcat));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc\u0000def", "abc\u0007def", "abc\u001bdef", "abc\u007fdef", "abc\ndef", "abc\rdef",
+            "abc\tdef"})
+    void replacesAnIdWithControlCharacters(String id) throws Exception {
+        assertGenerated(filter(id));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc def", "abc  def", " a b "})
+    void replacesAnIdWithInnerSpaces(String id) throws Exception {
+        assertGenerated(filter(id));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc/def", "a;b", "a,b", "<script>", "a\"b", "a=b", "a+b", "{id}", "a%20b"})
+    void replacesAnIdWithOtherPunctuation(String id) throws Exception {
         assertGenerated(filter(id));
     }
 

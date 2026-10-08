@@ -26,6 +26,9 @@ import tools.jackson.databind.JsonNode;
 class AnalysisFailureIT extends RabbitIntegrationTest {
 
     private static final int ATTEMPTS = 3;
+    private static final String REASON_PREFIX = "Analysis failed after all retries: ";
+    /** One character outside the Basic Multilingual Plane: two UTF-16 code units. */
+    private static final String EMOJI = "\uD83D\uDE00";
 
     @MockitoBean
     private RiskAnalyzer analyzer;
@@ -44,7 +47,7 @@ class AnalysisFailureIT extends RabbitIntegrationTest {
         assertThat(failed.getMessageProperties().getMessageId())
                 .isEqualTo(EventIds.forFiling(filingId, EventType.ANALYSIS_FAILED).toString());
         assertThat(failedEvent.get("payload").get("reason").asString())
-                .isEqualTo("Analysis failed after all retries: IllegalStateException: rule engine error");
+                .isEqualTo(REASON_PREFIX + "IllegalStateException: rule engine error");
         assertThat(events.subList(0, events.size() - 1))
                 .extracting(m -> m.getMessageProperties().getMessageId())
                 .containsOnly(EventIds.forFiling(filingId, EventType.ANALYSIS_STARTED).toString());
@@ -53,6 +56,23 @@ class AnalysisFailureIT extends RabbitIntegrationTest {
                 assertThat(messageCount(MessagingTopology.Q_ANALYSIS_FILING_SUBMITTED)).isZero());
         assertNoMoreMessages(DEAD_LETTER_QUEUE);
         assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void cutsALongReasonToTheSchemaLimitWithoutSplittingASurrogatePair() {
+        String fixedPart = REASON_PREFIX + "IllegalStateException: ";
+        String detail = "x".repeat(MessagingProperties.SCHEMA_MAX_REASON_LENGTH - fixedPart.length() - 1)
+                + EMOJI.repeat(MessagingProperties.SCHEMA_MAX_REASON_LENGTH);
+        when(analyzer.analyze(anyString())).thenThrow(new IllegalStateException(detail));
+
+        sendFilingSubmitted(filingSubmitted(UUID.randomUUID()).toString());
+
+        JsonNode failedEvent = json(receiveEventsUntil(EventType.ANALYSIS_FAILED).getLast());
+        String reason = failedEvent.get("payload").get("reason").asString();
+        assertThat(ContractFixtures.validate(EventType.ANALYSIS_FAILED, failedEvent)).isEmpty();
+        assertThat(reason).hasSize(MessagingProperties.SCHEMA_MAX_REASON_LENGTH - 1)
+                .isEqualTo((fixedPart + detail).substring(0, MessagingProperties.SCHEMA_MAX_REASON_LENGTH - 1));
+        assertNoMoreMessages(DEAD_LETTER_QUEUE);
     }
 
     private long messageCount(String queue) {

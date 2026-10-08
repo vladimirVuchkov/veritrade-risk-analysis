@@ -9,10 +9,17 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-/** An event waiting to be published. The id is the event id of the envelope stored in the payload. */
+/**
+ * An event waiting to be published. The id is the event id of the envelope stored in the payload.
+ * {@code attempts} counts only failures of this row itself; a row that reaches the maximum is parked
+ * ({@code parked_at} set) and is no longer sent.
+ */
 @Entity
 @Table(name = "outbox")
 public class OutboxEvent {
+
+    /** Length of the {@code last_error} column (V2 migration). */
+    public static final int LAST_ERROR_LENGTH = 1000;
 
     @Id
     private UUID id;
@@ -32,6 +39,15 @@ public class OutboxEvent {
 
     @Column(name = "published_at")
     private Instant publishedAt;
+
+    @Column(nullable = false)
+    private int attempts;
+
+    @Column(name = "last_error", length = LAST_ERROR_LENGTH)
+    private String lastError;
+
+    @Column(name = "parked_at")
+    private Instant parkedAt;
 
     protected OutboxEvent() {
     }
@@ -66,5 +82,9 @@ public class OutboxEvent {
 
     public Instant publishedAt() {
         return publishedAt;
+    }
+
+    public int attempts() {
+        return attempts;
     }
 }

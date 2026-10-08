@@ -5,8 +5,10 @@ import com.veritrade.contracts.event.AnalysisFailedPayload;
 import com.veritrade.contracts.event.AnalysisStartedPayload;
 import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.event.EventType;
+import com.veritrade.ingestion.config.IngestionProperties;
 import com.veritrade.ingestion.domain.FilingStatus;
 import com.veritrade.ingestion.service.StatusUpdate;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -19,19 +21,25 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Tolerant reader of analysis events: dispatches on the {@code eventType} field (never on a Java type
  * header), ignores unknown fields and rejects with {@link InvalidEventException} anything it cannot use.
+ * As the contract requires (messaging-topology.md, "Event versioning" and "Text limits"), that includes an
+ * {@code eventVersion} above {@link EventEnvelope#CURRENT_VERSION} and a failure reason over its limit in
+ * UTF-16 units: both go to the dead-letter queue without retries, so they can be replayed later.
  */
 @Component
 public class AnalysisEventReader {
 
     private final JsonMapper jsonMapper;
+    private final int maxFailureReasonLength;
 
-    public AnalysisEventReader(JsonMapper jsonMapper) {
+    public AnalysisEventReader(JsonMapper jsonMapper, IngestionProperties properties) {
         this.jsonMapper = jsonMapper;
+        this.maxFailureReasonLength = properties.filing().maxFailureReasonLength();
     }
 
     public AnalysisEvent read(byte[] body) {
         JsonNode tree = parse(body);
         EventType type = analysisEventType(tree);
+        requireSupportedVersion(tree);
         EventEnvelope<?> envelope = envelope(tree, type);
         return new AnalysisEvent(type, envelope.correlationId(), statusUpdate(envelope));
     }
@@ -59,6 +67,16 @@ public class AnalysisEventReader {
                 .orElseThrow(() -> new InvalidEventException("Not an analysis event type: " + node.asString()));
     }
 
+    /** A missing or malformed version is left to the envelope check; only a newer one is singled out here. */
+    private static void requireSupportedVersion(JsonNode tree) {
+        JsonNode version = tree.get("eventVersion");
+        if (version != null && version.isIntegralNumber()
+                && version.bigIntegerValue().compareTo(BigInteger.valueOf(EventEnvelope.CURRENT_VERSION)) > 0) {
+            throw new InvalidEventException("Unsupported eventVersion " + version
+                    + "; the highest supported version is " + EventEnvelope.CURRENT_VERSION);
+        }
+    }
+
     private EventEnvelope<?> envelope(JsonNode tree, EventType type) {
         JavaType javaType = jsonMapper.getTypeFactory().constructParametricType(EventEnvelope.class, type.payloadType());
         try {
@@ -70,7 +88,7 @@ public class AnalysisEventReader {
         }
     }
 
-    private static StatusUpdate statusUpdate(EventEnvelope<?> envelope) {
+    private StatusUpdate statusUpdate(EventEnvelope<?> envelope) {
         return switch (envelope.payload()) {
             case AnalysisStartedPayload started ->
                     update(envelope, started.filingId(), FilingStatus.ANALYZING, null);
@@ -89,9 +107,13 @@ public class AnalysisEventReader {
         return new StatusUpdate(envelope.eventId(), filingId, target, reason);
     }
 
-    private static String requireReason(String reason) {
+    private String requireReason(String reason) {
         if (reason == null || reason.isBlank()) {
             throw new InvalidEventException("payload.reason is missing");
+        }
+        if (reason.length() > maxFailureReasonLength) {
+            throw new InvalidEventException("payload.reason has " + reason.length()
+                    + " UTF-16 units; the limit is " + maxFailureReasonLength);
         }
         return reason;
     }

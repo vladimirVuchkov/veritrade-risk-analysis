@@ -13,14 +13,12 @@ PROCESSING_TIMEOUT_SECONDS=30  # submit (or recovery) -> COMPLETED / report 200
 DEAD_LETTER_TIMEOUT_SECONDS=15 # publish -> message visible in a dead-letter queue
 LOG_TIMEOUT_SECONDS=15         # publish -> the consumer logs that it handled the event
 SERVICE_START_TIMEOUT_SECONDS=120
-UPSTREAM_GONE_SECONDS=60       # nginx: stopped upstream -> 503 (see the agent-f-e2e handoff note)
+UPSTREAM_UNAVAILABLE_MAX_MS=5000 # nginx: stopped upstream -> 503 (proxy_connect_timeout is 2 s)
+UPSTREAM_ADDRESS_CACHE_SECONDS=7 # nginx keeps a resolved address 5 s (resolver valid=5s), plus a margin
 
 SCENARIOS_ALL="a b c d e f"
 RESULTS=""
 FAILED=0
-
-# Runs in the repository root, so docker compose finds docker-compose.yml (or honours COMPOSE_FILE).
-compose() { (cd "$ROOT_DIR" && docker compose "$@"); }
 
 stop_service() {
     info "stopping $1"
@@ -125,20 +123,60 @@ scenario_a() {
     expect_report "$FILING_ID"
 }
 
+# probe_loop URL FLAG_FILE OUT_FILE: one request every POLL_INTERVAL_SECONDS while FLAG_FILE exists.
+# Each line: start time (ms), HTTP status (000 when there was no answer), total time (s), content type.
+probe_loop() {
+    local started
+    while [ -f "$2" ]; do
+        started="$(now_ms)"
+        curl -s -o /dev/null --max-time "$HTTP_TIMEOUT_SECONDS" \
+            -w "$started %{http_code} %{time_total} %{content_type}\n" "$1" >> "$3" || true
+        sleep "$POLL_INTERVAL_SECONDS"
+    done
+}
+
+# stop_with_fast_unavailable SERVICE PATH: probes PATH in the background while SERVICE stops and until
+# nginx's cached address of the old container has expired. Every answer (also those sent while nginx
+# still holds that address) must arrive within UPSTREAM_UNAVAILABLE_MAX_MS, and every request sent
+# after the stop must be a 503 problem+json. One request each, no retry.
+stop_with_fast_unavailable() {
+    local flag="$WORK_DIR/probing" probes="$WORK_DIR/probes" prober stopped_at summary
+    : > "$probes"
+    touch "$flag"
+    probe_loop "$BASE_URL$2" "$flag" "$probes" &
+    prober=$!
+    stop_service "$1"
+    stopped_at="$(now_ms)"
+    sleep "$UPSTREAM_ADDRESS_CACHE_SECONDS"
+    rm -f "$flag"
+    wait "$prober" || true
+    # slowest-ms failed-requests answers-after-stop non-503-after-stop
+    summary="$(awk -v stopped="$stopped_at" '
+        { ms = $3 * 1000; if (ms > max) max = ms; if ($2 == "000") failed++ }
+        $1 >= stopped { after++; if ($2 != "503" || $4 !~ /problem\+json/) wrong++ }
+        END { printf "%d %d %d %d", max, failed, after, wrong }' "$probes")"
+    set -- $summary
+    info "$(wc -l < "$probes" | tr -d ' ') requests across the stop, slowest ${1} ms, ${3} after the stop"
+    [ "$2" -eq 0 ] || fail "$2 request(s) got no answer: $(grep ' 000 ' "$probes" | head -n 3)" || return 1
+    [ "$1" -le "$UPSTREAM_UNAVAILABLE_MAX_MS" ] \
+        || fail "the slowest answer took $1 ms, limit $UPSTREAM_UNAVAILABLE_MAX_MS ms" || return 1
+    [ "$3" -gt 0 ] && [ "$4" -eq 0 ] \
+        || fail "$4 of $3 answers after the stop were not 503 problem+json" || return 1
+    ok "every answer across the stop within $UPSTREAM_UNAVAILABLE_MAX_MS ms, 503 problem+json after it"
+}
+
 # (b) A stopped Reporting loses nothing: the result waits in its queue; the report appears after the restart.
+#     A stopped upstream cannot answer 404; nginx answers 503 problem+json at once, also while it
+#     still holds the old container address.
 scenario_b() {
-    stop_service reporting-service
+    stop_with_fast_unavailable reporting-service "/api/reports/$(new_uuid)" || return 1
     submit_demo b || return 1
     expect_completed "$FILING_ID" || return 1
-    # A stopped upstream cannot answer 404; nginx answers 503 application/problem+json instead. Right
-    # after the stop nginx may still try the old container address until its connect timeout, so the
-    # first request can time out: retry until the 503 arrives.
-    wait_for_report "$FILING_ID" 503 "$UPSTREAM_GONE_SECONDS"
-    [ "$HTTP_STATUS" != "200" ] || fail "report is 200 although Reporting is stopped" || return 1
+    http GET "$BASE_URL/api/reports/$FILING_ID"
     [ "$HTTP_STATUS" = "503" ] && is_problem_json \
         || fail "report is HTTP $HTTP_STATUS ($HTTP_CONTENT_TYPE) while Reporting is down, expected 503 problem+json" \
         || return 1
-    ok "report is not available while Reporting is down (nginx 503 problem+json)"
+    ok "report is 503 problem+json while Reporting is down"
     start_service reporting-service || fail "reporting-service did not become healthy" || return 1
     expect_report "$FILING_ID"
 }
@@ -252,6 +290,7 @@ run_scenario() {
 
 main() {
     require_tools curl docker
+    warn_if_weak_credentials
     local scenarios="${*:-$SCENARIOS_ALL}" name
     log "${BOLD}VeriTrade chaos test against $BASE_URL and $RABBIT_API${RESET}"
     ensure_stack_up || die "the Compose stack is not healthy; start it with: docker compose up --build -d --wait"

@@ -45,7 +45,7 @@ class FilingSubmittedListenerTest {
 
     private final AnalysisEventPublisher publisher = mock(AnalysisEventPublisher.class);
     private final FilingSubmittedReader reader = new FilingSubmittedReader(JsonMapper.builder().build());
-    private final AnalysisEventFactory events = new AnalysisEventFactory(Clock.fixed(NOW, ZoneOffset.UTC));
+    private final AnalysisEventFactory events = new AnalysisEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), TestMessages.MESSAGING);
     private final List<EventEnvelope<?>> published = new ArrayList<>();
     private final List<String> correlationIdsInLog = new ArrayList<>();
 
@@ -100,13 +100,25 @@ class FilingSubmittedListenerTest {
     }
 
     @Test
-    void acceptsANewerEventVersion() {
+    void acceptsTheCurrentEventVersion() {
         ObjectNode event = filingSubmitted(UUID.randomUUID());
-        event.put("eventVersion", 2);
+        event.put("eventVersion", EventEnvelope.CURRENT_VERSION);
 
         listener().onFilingSubmitted(message(event));
 
         assertThat(published).hasSize(2);
+    }
+
+    @ParameterizedTest(name = "eventVersion {0}")
+    @ValueSource(ints = {EventEnvelope.CURRENT_VERSION + 1, Integer.MAX_VALUE})
+    void rejectsANewerEventVersionWithoutPublishingAnything(int version) {
+        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        event.put("eventVersion", version);
+
+        assertThatThrownBy(() -> listener().onFilingSubmitted(message(event)))
+                .isInstanceOf(InvalidFilingMessageException.class)
+                .hasMessageContaining("Unsupported eventVersion " + version);
+        verifyNoInteractions(publisher);
     }
 
     @Test

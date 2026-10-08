@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.veritrade.analysis.domain.AnalysisResult;
 import com.veritrade.analysis.support.ContractFixtures;
+import com.veritrade.analysis.support.TestMessages;
 import com.veritrade.contracts.event.EventEnvelope;
 import com.veritrade.contracts.messaging.MessagingTopology;
 import com.veritrade.contracts.model.RiskLevel;
@@ -46,9 +47,9 @@ class AnalysisEventPublisherTest {
 
     private final RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
     private final AnalysisEventFactory events = new AnalysisEventFactory(
-            Clock.fixed(Instant.parse("2026-10-07T12:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-10-07T12:00:00Z"), ZoneOffset.UTC), TestMessages.MESSAGING);
     private final AnalysisEventPublisher publisher =
-            new AnalysisEventPublisher(rabbitTemplate, new MessagingProperties(SHORT_TIMEOUT));
+            new AnalysisEventPublisher(rabbitTemplate, new MessagingProperties(SHORT_TIMEOUT, MessagingProperties.SCHEMA_MAX_REASON_LENGTH));
 
     @BeforeEach
     void templateWithTheJsonConverter() {
@@ -62,7 +63,7 @@ class AnalysisEventPublisherTest {
 
     static Stream<EventEnvelope<?>> allEvents() {
         UUID filingId = UUID.randomUUID();
-        AnalysisEventFactory factory = new AnalysisEventFactory(Clock.systemUTC());
+        AnalysisEventFactory factory = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING);
         AnalysisResult result = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
         return Stream.of(
                 factory.started(filingId, CORRELATION_ID),
