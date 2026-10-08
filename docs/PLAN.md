@@ -417,14 +417,14 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 
 ### Wave 3 — Review and delivery (orchestrator)
 
-| Task | Result |
-|---|---|
-| 3.1 Independent code review (one agent only reads and writes remarks; does not fix) | list of issues |
-| 3.2 Fix the remarks | |
-| 3.3 Clean clone: `docker compose up --build` + `smoke.sh` on a fresh checkout | confirmed |
-| 3.4 README review against the checklist (section 11) | |
-| 3.5 Conversation records ordered; denylist check and secret check (12.2) | records contain only this task |
-| 3.6 Publish to GitHub and open the link in a logged-out browser | URL for the reply email |
+| Task | Result | Status |
+|---|---|---|
+| 3.1 Independent code review (one agent only reads and writes remarks; does not fix) | list of issues | done: W3-01 to W3-09 |
+| 3.2 Fix the remarks | | done: Wave 3 commit |
+| 3.3 Clean clone: `docker compose up --build` + `smoke.sh` on a fresh checkout | confirmed | open |
+| 3.4 README review against the checklist (section 11) | | open |
+| 3.5 Conversation records ordered; denylist check and secret check (12.2) | records contain only this task | records 01-03 exported and checked; the final orchestrator session is exported last |
+| 3.6 Publish to GitHub and open the link in a logged-out browser | URL for the reply email | open; needs the author's approval to push |
 
 ---
 
@@ -563,3 +563,21 @@ The README "AI tools" section is a short extract of the log (tool -> what it was
 3. Parallel start of agents A–E (and G for documentation).
 4. Wave 2, then Wave 3.
 5. Publishing.
+
+## 15. Progress
+
+| Wave | State | Commit on `main` | Checks after the commit |
+|---|---|---|---|
+| 0 - Foundations | done, pushed | `5d3faef` and earlier | `mvnw verify`, Compose up |
+| 0 - Conversation record | done, local | `5aa2ec2` | denylist check |
+| 1 - Parallel implementation (A-E, G) | done, local | `aa5bd3c` | `mvnw verify`, frontend, Compose, smoke, chaos 6/6 |
+| 2 - Integration (F, G) | done, local | `0201723` | plus E2E 132/132, export tool tests |
+| 3.1-3.2 - Review and fixes (A, B, D, E, G) | done, local | Wave 3 commit | `mvnw verify` 840, frontend 218, export tool 7, E2E 144, smoke, chaos 6/6 |
+| 3.3 - Clean clone | open | | |
+| 3.4 - README against section 11 | open | | |
+| 3.5 - Conversation records | records 01-03 done; final export of the last orchestrator session open | | denylist and secret check |
+| 3.6 - Publishing | open; push only after the author's approval | | |
+
+Open items carried forward: a replay tool for parked outbox rows (known limitation, see README); the
+"My intervention" and "Decision" fields of the process log are filled in by the author.
+
