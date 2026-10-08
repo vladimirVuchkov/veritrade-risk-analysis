@@ -20,7 +20,7 @@ parallel, each in its own folder and git worktree, against a contract frozen in 
 #### [1] 2026-10-07 - Wave 0 - Orchestrator
 - **Goal:** create the repository skeleton and freeze the inter-service contract before the parallel work starts (plan tasks 0.1 to 0.7).
 - **Tool and model:** Claude Code (Claude Opus 5.5)
-- **Given to the AI:** the approved plan and the instruction to start Wave 0. Raw record: `ai-conversations/01-orchestrator-wave-0.md` (exported at the end of the session).
+- **Given to the AI:** the approved plan and the instruction to start Wave 0. Raw record: [`ai-conversations/01-orchestrator-wave-0.md`](ai-conversations/01-orchestrator-wave-0.md) (Docker setup subagent included).
 - **Received:**
   - Parent `pom.xml` on Spring Boot 4.1.1 with every version pinned; Maven wrapper 3.9.16.
   - `common-contracts`: event envelope and payload records, enums, topology constants, deterministic event ids, correlation id conventions.
@@ -38,6 +38,7 @@ parallel, each in its own folder and git worktree, against a contract frozen in 
   - json-schema-validator 3.x has a new API (`SchemaRegistry`); a negative test proves that the `$ref` between schemas is resolved and that invalid events are rejected.
   - The first version of the export tool printed the matched denylist terms in its own report, which would have leaked them into the next exported record. The report now masks the match and names only the denylist line.
   - The first version of the export tool matched denylist terms as substrings, which gave false positives inside longer words; it now matches whole words.
+  - The session was closed before its record was exported; it was exported the next day from the saved transcript. The denylist stopped the export on local Claude Code paths and on a name echoed by an early test run of the tool; these were masked with `--redact` (the name through its exact echoed form, so no other words changed).
 
 ### W1 - Parallel implementation
 
