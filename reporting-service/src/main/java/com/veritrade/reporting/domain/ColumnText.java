@@ -1,9 +1,9 @@
 package com.veritrade.reporting.domain;
 
 /**
- * Fits text into a VARCHAR column. The contract limits count code points, the database counts
- * UTF-16 units, so text that is valid by contract (for example many emoji) can still be too long
- * for its column. Such text is shortened without splitting a surrogate pair.
+ * Fits text into a VARCHAR column (sized in UTF-16 units) without splitting a surrogate pair. Events
+ * validated by the listener always fit, because the contract limits count the same units; this guards
+ * the service layer against text that did not pass that validation.
  */
 public final class ColumnText {
 

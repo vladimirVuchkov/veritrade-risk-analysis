@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Checks the parts of the analysis-completed and analysis-failed schemas that Reporting relies on.
- * Text limits are counted in code points, as in the JSON schemas.
+ * Text limits are counted in UTF-16 code units, as the contract specifies (the unit of the columns).
  */
 @Component
 public class AnalysisEventValidator {
@@ -62,10 +62,9 @@ public class AnalysisEventValidator {
         requireText(payload.reason(), limits.failureReasonMaxLength(), "reason");
     }
 
-    private static void requireText(String value, int maxCodePoints, String field) {
+    private static void requireText(String value, int maxUtf16Units, String field) {
         require(value != null && !value.isEmpty(), field + " is required");
-        require(value.codePointCount(0, value.length()) <= maxCodePoints,
-                field + " is longer than " + maxCodePoints + " characters");
+        require(value.length() <= maxUtf16Units, field + " is longer than " + maxUtf16Units + " UTF-16 units");
     }
 
     private static void require(boolean condition, String message) {

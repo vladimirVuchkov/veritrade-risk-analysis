@@ -294,15 +294,29 @@ class AnalysisEventReaderTest {
     }
 
     @Test
-    void countsTheLimitsInCodePointsNotUtf16Units() {
+    void acceptsEmojiTextExactlyAtTheLimitsInUtf16Units() {
         ObjectNode event = example(COMPLETED_EXAMPLE);
         ((ObjectNode) payload(event).get("findings").get(0))
-                .put("matchedText", TestEvents.emoji(500)).put("excerpt", TestEvents.emoji(1000));
+                .put("matchedText", TestEvents.emoji(250)).put("excerpt", TestEvents.emoji(500));
         ObjectNode failed = example(FAILED_EXAMPLE);
-        payload(failed).put("reason", TestEvents.emoji(1000));
+        payload(failed).put("reason", TestEvents.emoji(500));
 
         assertThat(reader.read(message(event, RK_COMPLETED)).payload()).isInstanceOf(AnalysisCompletedPayload.class);
         assertThat(reader.read(message(failed, RK_FAILED)).payload()).isInstanceOf(AnalysisFailedPayload.class);
+    }
+
+    /** The contract counts maxLength in UTF-16 units: these values are within the limit in code points only. */
+    @ParameterizedTest
+    @ValueSource(strings = {"matchedText:251", "excerpt:501"})
+    void rejectsEmojiTextOverTheLimitInUtf16UnitsAlthoughWithinItInCodePoints(String fieldAndEmoji) {
+        String[] parts = fieldAndEmoji.split(":");
+        ObjectNode event = example(COMPLETED_EXAMPLE);
+        ((ObjectNode) payload(event).get("findings").get(0)).put(parts[0], TestEvents.emoji(Integer.parseInt(parts[1])));
+        ObjectNode failed = example(FAILED_EXAMPLE);
+        payload(failed).put("reason", TestEvents.emoji(500) + "x");
+
+        assertInvalid(message(event, RK_COMPLETED));
+        assertInvalid(message(failed, RK_FAILED));
     }
 
     @ParameterizedTest

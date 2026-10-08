@@ -5,8 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Text limits of the analysis events. They equal the contract maxLength values (counted in code
- * points) and the column sizes of V1__init.sql (counted in UTF-16 units).
+ * Text limits of the analysis events. They equal the contract maxLength values and the column sizes
+ * of V1__init.sql, both counted in UTF-16 units.
  */
 @Validated
 @ConfigurationProperties("reporting.limits")

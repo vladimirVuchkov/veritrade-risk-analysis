@@ -13,6 +13,7 @@ PROCESSING_TIMEOUT_SECONDS=30  # submit (or recovery) -> COMPLETED / report 200
 DEAD_LETTER_TIMEOUT_SECONDS=15 # publish -> message visible in a dead-letter queue
 LOG_TIMEOUT_SECONDS=15         # publish -> the consumer logs that it handled the event
 SERVICE_START_TIMEOUT_SECONDS=120
+UPSTREAM_GONE_SECONDS=60       # nginx: stopped upstream -> 503 (see the agent-f-e2e handoff note)
 
 SCENARIOS_ALL="a b c d e f"
 RESULTS=""
@@ -129,9 +130,11 @@ scenario_b() {
     stop_service reporting-service
     submit_demo b || return 1
     expect_completed "$FILING_ID" || return 1
-    http GET "$BASE_URL/api/reports/$FILING_ID"
+    # A stopped upstream cannot answer 404; nginx answers 503 application/problem+json instead. Right
+    # after the stop nginx may still try the old container address until its connect timeout, so the
+    # first request can time out: retry until the 503 arrives.
+    wait_for_report "$FILING_ID" 503 "$UPSTREAM_GONE_SECONDS"
     [ "$HTTP_STATUS" != "200" ] || fail "report is 200 although Reporting is stopped" || return 1
-    # A stopped upstream cannot answer 404; nginx answers 503 application/problem+json instead.
     [ "$HTTP_STATUS" = "503" ] && is_problem_json \
         || fail "report is HTTP $HTTP_STATUS ($HTTP_CONTENT_TYPE) while Reporting is down, expected 503 problem+json" \
         || return 1

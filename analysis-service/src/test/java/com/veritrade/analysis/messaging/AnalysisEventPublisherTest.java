@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.veritrade.analysis.domain.AnalysisResult;
 import com.veritrade.analysis.support.ContractFixtures;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -45,8 +47,13 @@ class AnalysisEventPublisherTest {
     private final RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
     private final AnalysisEventFactory events = new AnalysisEventFactory(
             Clock.fixed(Instant.parse("2026-10-07T12:00:00Z"), ZoneOffset.UTC));
-    private final AnalysisEventPublisher publisher = new AnalysisEventPublisher(rabbitTemplate,
-            new JacksonJsonMessageConverter(JsonMapper.builder().build()), new MessagingProperties(SHORT_TIMEOUT));
+    private final AnalysisEventPublisher publisher =
+            new AnalysisEventPublisher(rabbitTemplate, new MessagingProperties(SHORT_TIMEOUT));
+
+    @BeforeEach
+    void templateWithTheJsonConverter() {
+        when(rabbitTemplate.getMessageConverter()).thenReturn(new JacksonJsonMessageConverter(JsonMapper.builder().build()));
+    }
 
     @AfterEach
     void clearInterruptFlag() {

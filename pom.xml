@@ -57,6 +57,17 @@
         </dependencies>
     </dependencyManagement>
 
+    <profiles>
+        <!-- End-to-end tests against the real Compose stack (needs Docker):
+             ./mvnw -B -Pe2e verify -pl e2e-tests -am -->
+        <profile>
+            <id>e2e</id>
+            <modules>
+                <module>e2e-tests</module>
+            </modules>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <!-- Unit tests: *Test (surefire). Integration tests with Testcontainers: *IT (failsafe). -->

@@ -15,8 +15,8 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
-import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.amqp.autoconfigure.RabbitListenerRetrySettingsCustomizer;
+import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -65,9 +65,17 @@ public class RabbitConfig {
                 .with(Q_ANALYSIS_FILING_SUBMITTED);
     }
 
+    /**
+     * The JSON converter goes on the template only. It is deliberately not a {@code MessageConverter}
+     * bean: Spring Boot would also give it to the listener container, which would then convert every
+     * body (by the producer's {@code __TypeId__} header) before the listener runs. An unreadable body
+     * would fail in the container and be retried, and a valid filing with a type header would end as
+     * {@code analysis.failed}. The listener receives the raw message and {@code FilingSubmittedReader}
+     * reads it.
+     */
     @Bean
-    MessageConverter messageConverter(JsonMapper jsonMapper) {
-        return new JacksonJsonMessageConverter(jsonMapper);
+    RabbitTemplateCustomizer jsonTemplateConverter(JsonMapper jsonMapper) {
+        return template -> template.setMessageConverter(new JacksonJsonMessageConverter(jsonMapper));
     }
 
     /** An invalid message is never retried; the recoverer sends it to the dead-letter queue at once. */

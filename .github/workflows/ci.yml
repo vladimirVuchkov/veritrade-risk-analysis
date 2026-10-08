@@ -35,6 +35,9 @@ jobs:
       - name: Frontend tests
         run: node --test frontend/test/
 
+      - name: Export tool tests
+        run: python3 -m unittest discover -s scripts/tests
+
   e2e:
     name: Compose smoke and chaos tests
     needs: build
@@ -63,3 +66,37 @@ jobs:
       - name: Stop the stack
         if: always()
         run: docker compose down -v
+
+  e2e-suite:
+    name: End-to-end suite (e2e-tests module)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # The suite starts its own Compose project on random host ports; CI keeps it for the log dump.
+      E2E_PROJECT: veritrade-e2e-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Maven verify with the e2e profile
+        run: ./mvnw -B -Pe2e verify -pl e2e-tests -am -De2e.project="$E2E_PROJECT" -De2e.keepStack=true
+
+      - name: Service logs
+        if: failure()
+        run: |
+          docker compose -p "$E2E_PROJECT" ps -a
+          docker compose -p "$E2E_PROJECT" logs --no-color --timestamps
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose -p "$E2E_PROJECT" down -v --remove-orphans

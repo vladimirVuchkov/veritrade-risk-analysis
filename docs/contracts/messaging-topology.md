@@ -121,3 +121,16 @@ queues; they are inspected through the management UI (port 15672).
   ignore unknown fields.
 - A breaking change gets a new version; consumers support the old and the new version during the
   rollout.
+- A consumer that receives an `eventVersion` higher than the versions it supports sends the message
+  to its dead-letter queue without retries; it is neither processed nor dropped, so it can be
+  replayed after the consumer is upgraded. Every consumer applies this rule the same way.
+
+## Text limits
+
+- `maxLength` in the event schemas and the OpenAPI counts UTF-16 code units, the unit of the
+  database columns (JSON Schema validators count code points, so they accept a slightly longer
+  text made of characters outside the Basic Multilingual Plane; the services enforce the stricter
+  limit).
+- Producers never send a text over its limit. In particular, Analysis cuts the `analysis.failed`
+  `reason` to 1000 UTF-16 code units without splitting a surrogate pair. A consumer that receives
+  an over-limit text sends the message to its dead-letter queue.

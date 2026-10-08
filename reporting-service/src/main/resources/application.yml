@@ -22,6 +22,10 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # A connection attempt to a stopped broker container can hang until this timeout (60 s by default).
+    # It must stay well below Docker's 10 s stop grace period, or a shutdown during a broker outage is
+    # killed and H2 can lose recently committed data.
+    connection-timeout: 2s
     listener:
       simple:
         acknowledge-mode: auto
@@ -35,7 +39,7 @@ spring:
           max-interval: 5s
 
 reporting:
-  # Contract maxLength values (code points), equal to the column sizes in V1__init.sql.
+  # Contract maxLength values (UTF-16 units), equal to the column sizes in V1__init.sql.
   limits:
     rule-id-max-length: 32
     rules-version-max-length: 32

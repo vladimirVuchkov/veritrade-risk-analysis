@@ -17,9 +17,15 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -28,12 +34,20 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     private static final String CORRELATION_ID = "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20";
 
+    private static final String TYPE_ID_HEADER = "__TypeId__";
+
     @MockitoSpyBean
     private FilingSubmittedReader reader;
 
+    @MockitoSpyBean
+    private FilingSubmittedListener listener;
+
+    @Autowired
+    private ApplicationContext context;
+
     @BeforeEach
     void resetSpy() {
-        clearInvocations(reader);
+        clearInvocations(reader, listener);
     }
 
     @Test
@@ -74,6 +88,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
         assertThat(new String(dead.getBody())).contains("broken");
         assertRejectedOnce(dead);
+        verify(listener, times(1)).onFilingSubmitted(any());
         verify(reader, times(1)).read(any());
         assertNoMoreMessages(CAPTURE_QUEUE);
     }
@@ -86,6 +101,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
         sendFilingSubmitted(event.toString());
 
         assertRejectedOnce(receive(DEAD_LETTER_QUEUE));
+        verify(listener, times(1)).onFilingSubmitted(any());
         verify(reader, times(1)).read(any());
         assertNoMoreMessages(CAPTURE_QUEUE);
     }
@@ -126,6 +142,25 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
         assertThat(eventType(receive(CAPTURE_QUEUE))).isEqualTo(EventType.ANALYSIS_STARTED);
         assertThat(eventType(receive(CAPTURE_QUEUE))).isEqualTo(EventType.ANALYSIS_COMPLETED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.veritrade.contracts.event.EventEnvelope", "java.lang.Runtime", "com.example.Missing"})
+    void ignoresAJavaTypeHeaderOnAValidFiling(String typeId) {
+        UUID filingId = UUID.randomUUID();
+
+        sendFilingSubmitted(filingSubmitted(filingId).toString(), Map.of(TYPE_ID_HEADER, typeId));
+
+        assertEvent(receive(CAPTURE_QUEUE), EventType.ANALYSIS_STARTED, filingId);
+        assertEvent(receive(CAPTURE_QUEUE), EventType.ANALYSIS_COMPLETED, filingId);
+        verify(listener, times(1)).onFilingSubmitted(any());
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void theListenerContainerGetsNoJsonConverter() {
+        assertThat(context.getBeansOfType(MessageConverter.class)).isEmpty();
+        assertThat(rabbitTemplate.getMessageConverter()).isInstanceOf(JacksonJsonMessageConverter.class);
     }
 
     private static void assertEvent(Message message, EventType type, UUID filingId) {

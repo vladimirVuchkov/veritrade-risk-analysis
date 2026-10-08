@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.BindingBuilder;
@@ -75,8 +76,13 @@ public abstract class RabbitIntegrationTest {
     }
 
     protected void sendFilingSubmitted(String body) {
+        sendFilingSubmitted(body, Map.of());
+    }
+
+    protected void sendFilingSubmitted(String body, Map<String, Object> headers) {
         MessageProperties properties = new MessageProperties();
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        headers.forEach(properties::setHeader);
         rabbitTemplate.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_FILING_SUBMITTED,
                 new Message(body.getBytes(StandardCharsets.UTF_8), properties));
     }

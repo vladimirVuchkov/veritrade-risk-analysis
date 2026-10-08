@@ -159,14 +159,23 @@ def load_denylist(path):
     return entries
 
 
+def mask_all(line, checks):
+    for _, pattern in checks:
+        line = pattern.sub("***", line)
+    return line
+
+
 def find_problems(text, denylist):
-    """Return (line number, reason, line with the match masked). Matches are masked so the report does not leak them."""
+    """Return (line number, reason, line with every match masked).
+
+    Every check is masked, not only the one that matched, so a line holding two terms never shows either.
+    """
     checks = denylist + [(f"possible secret: {kind}", pattern) for kind, pattern in SECRET_PATTERNS.items()]
     problems = []
     for number, line in enumerate(text.splitlines(), start=1):
-        for reason, pattern in checks:
-            if pattern.search(line):
-                problems.append((number, reason, pattern.sub("***", line)))
+        reasons = [reason for reason, pattern in checks if pattern.search(line)]
+        if reasons:
+            problems.append((number, ", ".join(reasons), mask_all(line, checks)))
     return problems
 
 

@@ -77,6 +77,81 @@
 - `node --test frontend/test/` prints `tests 170`, `pass 170`, `fail 0` (Node 22).
 - The Mermaid diagrams render in the GitHub Markdown preview.
 
+## Wave 2
+Branch `agent/docs-w2`, from `main` at `aa5bd3c` (Wave 1 merged). The Wave 1 parts above are kept as
+they were written; where they differ, this part is current.
+
+### Done
+- Checked every `<!-- verify after infra merge -->` part against `docker-compose.yml`,
+  `.env.example`, `infra/docker/*.Dockerfile`, `infra/nginx/default.conf`, `scripts/smoke.sh`,
+  `scripts/chaos.sh`, `scripts/lib/common.sh`, `scripts/demo-filing.json`, `.github/workflows/ci.yml`
+  and `docs/handoff/agent-e-infra.md`, corrected it and removed the marker. None is left.
+  1. README, prerequisites and start: now `docker compose up --build -d --wait`, with the health
+     checks and the start order. Added `docker compose down -v`.
+  2. README, addresses: the env variables `UI_PORT` and `RABBITMQ_MANAGEMENT_PORT`; the credentials
+     are `veritrade`/`veritrade` only without `.env` (`.env.example` has `change-me`); the internal
+     ports; the password-only-on-volume-creation caveat.
+  3. README, curl example: matches `FilingController` (202, `Location`, body). Added that nginx
+     passes `X-Correlation-Id` both ways.
+  4. README, smoke and chaos: the Wave 1 text undersold both scripts (smoke "plus a 2 MB filing";
+     chaos only "stop Analysis"). Now it lists every smoke check and has a table of the six chaos
+     scenarios (a)-(f), plus the graceful-restart caveat of (e).
+  5. README, CI: the Wave 1 text said one job runs `docker compose down` after smoke. The real
+     workflow has two jobs; the second also runs `scripts/chaos.sh`, prints logs on failure and runs
+     `docker compose down -v`. The first job also runs the frontend tests.
+  6. `docs/architecture.md`, ports and nginx: the marker paragraph pointed to PLAN.md. Replaced with
+     the volumes, the `.env` ports and a new section 12 on the single parameterised Java Dockerfile
+     (and why) and the nginx behaviour.
+- Added links to `scripts/smoke.sh`, `scripts/chaos.sh`, `scripts/demo-filing.json`,
+  `scripts/lib/common.sh`, `.github/workflows/ci.yml`, both Dockerfiles, `default.conf`,
+  `docker-compose.yml` and `.env.example`.
+- Corrected facts that changed after Wave 1:
+  - Reporting down: nginx answers 503 problem+json (the README said "404, or 502 from nginx"), and the
+    UI retries 502/503/504 and network errors, giving up after more than 3 in a row.
+  - The `__TypeId__` bug: a README subsection "Lesson: the `__TypeId__` header", a paragraph in the
+    architecture events section, and a line in the AI tools section.
+  - Test counts: `./mvnw verify` 654 (contracts 29; Ingestion 259 + 20 IT; Analysis 183 + 12 IT;
+    Reporting 134 + 17 IT); frontend 188.
+  - Known limitations: no Content-Security-Policy, the RabbitMQ password caveat, script host ports and
+    timing on macOS.
+- ADR 0010: one consequence on nginx failure handling.
+
+### Known issues and limitations
+- The README end-to-end subsection was a placeholder (`<!-- filled after Wave 2 E2E merge -->`) until
+  Agent F's `e2e-tests` module was merged; it is filled now (see below).
+- The Java test counts are taken from the task, not from my own run: I did not run `./mvnw verify` in
+  Wave 2, and I did not run Compose, because Agent F was using Docker and the ports.
+- The AI tools section still describes Wave 3 as planned.
+
+### How to verify
+- Link check (script in my scratchpad, not in the repository) over `README.md`,
+  `docs/architecture.md`, `docs/decisions/*.md` and this note: 79 relative links in 13 files,
+  0 broken (anchors included).
+- `node --test frontend/test/` (Node 22.23.2): `tests 188`, `pass 188`, `fail 0`.
+- `grep -rn "verify after infra merge" README.md docs/architecture.md docs/decisions/` finds nothing.
+
+### After the E2E merge
+Branch `agent/docs-w2b`, from `integration/wave2` (Agent F's suite and my Wave 2 docs merged).
+- README "End-to-end test suite": the placeholder and its marker are replaced. It covers the command
+  `./mvnw -B -Pe2e verify -pl e2e-tests -am`, its own Compose project on random ports, access only
+  through nginx and the management API, `down -v` at the end, a table of the 18 scenarios mapped to
+  their test classes, about 4 min for 132 tests, the frontend flow against the real stack, and the
+  CI job `e2e-suite` (now three CI jobs).
+- README "Export tool": `python3 -m unittest discover -s scripts/tests` (7 tests).
+- README "Lessons from the real stack" (it replaces "Lesson: the `__TypeId__` header"): the
+  converter is kept off the listener in Analysis and Ingestion, Reporting counts UTF-16 units, and the
+  broker-outage shutdown that lost H2 commits, fixed with `spring.rabbitmq.connection-timeout: 2s` in
+  Ingestion and Reporting. The architecture events paragraph is updated to match.
+- Known limitations: H2 can lose commits on a hard kill; the schema `maxLength` counts code points;
+  a higher `eventVersion` gives a `COMPLETED` filing without a report; nginx's first request to a
+  stopped service can hang about 20 s.
+- Test counts: `./mvnw verify` 663 (no per-module split given), E2E 132, frontend 188, export tool 7.
+- Repository layout: `e2e-tests/` and `scripts/tests/`.
+- Checks: the link check finds 86 relative links in 13 files, 0 broken.
+  `python3 -m unittest discover -s scripts/tests` ran 7 tests, OK. I ran neither Maven nor Compose;
+  the 663 and 132 counts come from Agent F's handoff and the orchestrator.
+- No placeholders are left in the README.
+
 ## AI record
 - Raw record: exported by the orchestrator from its session (subagent transcript)
 - Asked for: Wave 2 Agent G. That meant the README per PLAN.md section 10, `docs/architecture.md`

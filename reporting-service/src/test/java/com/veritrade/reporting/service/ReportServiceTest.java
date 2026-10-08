@@ -251,7 +251,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void fitsContractValidSupplementaryTextIntoTheColumnsWithoutSplittingPairs() {
+    void fitsOverlongSupplementaryTextIntoTheColumnsWithoutSplittingPairs() {
         FindingPayload emojiFinding = new FindingPayload(RiskCategory.LEGAL, Severity.HIGH,
                 "LEGAL-001", emoji(500), "x" + emoji(999), 0);
         service.recordCompleted(UUID.randomUUID(), completed(filingId, RiskLevel.HIGH, List.of(emojiFinding)));

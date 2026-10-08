@@ -69,6 +69,23 @@ _Entries are collected from the handoff notes in `handoff/`._
 
 ### W2 - Integration
 
+#### [3] 2026-10-08 - Wave 2 - Orchestrator with agents F and G
+- **Goal:** end-to-end tests for every scenario of the whole system against the real Compose stack, fixes for what they find, and documentation that matches the merged code.
+- **Tool and model:** Claude Code (Claude Opus 5.5); orchestrator session with two parallel subagents in their own worktrees.
+- **Given to the AI:** Agent F: the list of 18 scenarios (happy path, validation, query edge cases, correlation id, each service and the broker down, duplicates, late and out-of-order events, failure path, poison messages, type headers, versions, concurrency, static UI, topology) and permission to fix only bugs its tests prove. Agent G: verify every infra-dependent statement in the docs and document the E2E suite. Raw record: exported by the orchestrator from its session (subagent transcripts included). Details: [`handoff/agent-f-e2e.md`](handoff/agent-f-e2e.md), [`handoff/agent-g-docs.md`](handoff/agent-g-docs.md).
+- **Received:**
+  - `e2e-tests` module (Maven profile `e2e`): 132 tests in 13 classes on a Compose project of its own with random ports, plus the frontend polling flow run with Node against the real stack; a CI job for it.
+  - Service fixes proven by the suite: Analysis kept the JSON converter on its listener (a `__TypeId__` header failed valid filings, unreadable JSON was retried); Reporting counted text limits in code points; with the broker down a stop exceeded Docker's grace period, the container was killed and H2 lost recent commits (fixed with a 2 s broker connection timeout).
+  - README and architecture checked against the infrastructure; E2E, export tool tests and lessons documented.
+- **My intervention:** _to be completed_
+- **Decision:** _to be completed_
+- **Verification:** `./mvnw -B verify` green (663 tests); `./mvnw -B -Pe2e verify -pl e2e-tests -am` 132/132 (two consecutive runs by Agent F, one by the orchestrator); `node --test frontend/test/` 188/188; export tool 7/7; `scripts/smoke.sh` passed; `scripts/chaos.sh` six of six.
+- **Problems/lessons:**
+  - An independent read-only review (Wave 3.1) ran in parallel with Agent F and confirmed the Analysis converter and Reporting length bugs as well; they were handed to Agent F, the remaining findings to Wave 3.
+  - The export tool showed denylisted terms in its own report when one line held two of them (each report line masked only the term that triggered it). The orchestrator fixed it and added 7 tests; two of them fail on the old version.
+  - The contract left open what a consumer does with an unknown higher `eventVersion` (Ingestion and Analysis processed it, Reporting dead-lettered it) and who enforces the failure-reason limit. The orchestrator decided both in `messaging-topology.md`: dead-letter in every consumer, Analysis cuts the reason.
+  - nginx's default 60 s connect timeout made the first request to a just-stopped service hang about 20 s; the scripts and tests retry, and the nginx setting is a Wave 3 item.
+
 ### W3 - Review and delivery
 
 ## 3. Part of the system -> AI contribution -> my contribution

@@ -8,3 +8,4 @@ data/
 .env
 build.log
 __pycache__/
+.claude/

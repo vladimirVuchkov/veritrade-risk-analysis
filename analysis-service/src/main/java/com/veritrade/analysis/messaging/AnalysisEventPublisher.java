@@ -11,7 +11,6 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,13 +23,11 @@ import org.springframework.stereotype.Component;
 public class AnalysisEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
-    private final MessageConverter messageConverter;
     private final Duration confirmTimeout;
 
-    public AnalysisEventPublisher(
-            RabbitTemplate rabbitTemplate, MessageConverter messageConverter, MessagingProperties properties) {
+    /** The template carries the JSON converter (see {@code RabbitConfig}). */
+    public AnalysisEventPublisher(RabbitTemplate rabbitTemplate, MessagingProperties properties) {
         this.rabbitTemplate = rabbitTemplate;
-        this.messageConverter = messageConverter;
         this.confirmTimeout = properties.confirmTimeout();
     }
 
@@ -48,7 +45,7 @@ public class AnalysisEventPublisher {
         properties.setCorrelationId(event.correlationId());
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         properties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-        return messageConverter.toMessage(event, properties);
+        return rabbitTemplate.getMessageConverter().toMessage(event, properties);
     }
 
     private void awaitConfirm(EventEnvelope<?> event, CorrelationData correlation) {

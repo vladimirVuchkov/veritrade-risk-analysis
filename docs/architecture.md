@@ -31,11 +31,12 @@ flowchart LR
 | Ingestion | 8081 | no | H2 file `ingestion` (`filings`, `outbox`) |
 | Analysis | 8082 (health only) | no | none |
 | Reporting | 8083 | no | H2 file `reporting` (`reports`, `findings`, `processed_events`) |
-| RabbitMQ | 5672 (AMQP), 15672 (management) | management only | durable queues |
+| RabbitMQ | 5672 (AMQP), 15672 (management) | management only | durable queues (volume `rabbitmq-data`) |
 
-<!-- verify after infra merge -->
-The ports and the nginx routes follow PLAN.md section 3.1.1 and task E3. The frontend container and
-the nginx configuration are added by the infrastructure work.
+The H2 files live in the volumes `ingestion-data` and `reporting-data`. The two published host ports
+can be changed with `UI_PORT` and `RABBITMQ_MANAGEMENT_PORT` in `.env` (see
+[`.env.example`](../.env.example)). All containers share one Compose network, `backend`. How the
+containers are built and what nginx does is in [section 12](#12-containers-and-nginx).
 
 Responsibilities:
 
@@ -68,6 +69,13 @@ Every event uses the same envelope: `eventId`, `eventType`, `eventVersion` (1), 
 AMQP properties on every message: `messageId` = `eventId`, `contentType` = `application/json`,
 `correlationId` = the envelope `correlationId`, persistent delivery. Producers publish with
 `mandatory = true` and wait for the publisher confirm.
+
+Consumers dispatch on the envelope's `eventType`, never on Spring's `__TypeId__` header, which
+`JacksonJsonMessageConverter` adds. Analysis and Ingestion therefore put their JSON converter only on
+the `RabbitTemplate` and not on the listener container, so their listeners read the raw message;
+Reporting has no converter bean. Earlier, the converter was a bean, the listener container converted
+by `__TypeId__`, and valid events were dead-lettered or failed. Only runs against the real stack
+found this (see the [README](../README.md#the-__typeid__-header)).
 
 ## 3. Happy path
 
@@ -110,6 +118,10 @@ sequenceDiagram
     N->>R: forward
     R-->>U: 404 until stored, then 200 report
 ```
+
+The UI polls every 2 s, at most 30 times for the status and 15 times for the report. A 502, 503 or
+504 (nginx answers 503 for a stopped service) or a network error does not end the flow: the UI
+retries, and gives up only after more than 3 such errors in a row.
 
 ## 4. Processing failure path
 
@@ -325,7 +337,57 @@ All limits are set in `veritrade.analysis.rules.*` (`RulesProperties`).
 
 ## 11. Observability
 
-- `GET /actuator/health` on every service, used by the container health checks.
+- `GET /actuator/health` on every service, used by the container health checks. nginx has its own
+  `/healthz`.
 - Ingestion takes the `X-Correlation-Id` request header, or generates an id, and returns it in the
   response. The id travels in the envelope and in the AMQP `correlationId`, and every log line shows
   it (`[%X{correlationId}]`).
+- nginx writes the `X-Correlation-Id` request header into its access log (`cid="..."`), next to the
+  upstream address and the request time.
+
+## 12. Containers and nginx
+
+The stack is defined in [`docker-compose.yml`](../docker-compose.yml): RabbitMQ, the three services
+and nginx. Every container has a health check, and `depends_on: condition: service_healthy` orders the
+start: the Java services wait for RabbitMQ, and nginx waits for Ingestion and Reporting. Services
+restart `unless-stopped`.
+
+### One Dockerfile for the Java services
+
+[`infra/docker/java-service.Dockerfile`](../infra/docker/java-service.Dockerfile) builds any of the
+three services. Compose passes the build arguments `SERVICE` (the Maven module) and `PORT`. The three
+builds differ only in these two values, so three copies of the file would only drift apart. The
+build:
+
+- is multi-stage, with the repository root as the context;
+- runs `./mvnw -B -q -pl <service> -am package -DskipTests` with a BuildKit cache mount on
+  `/root/.m2`. Only `src/main` of the service and of `common-contracts` is copied, so no test code is
+  compiled in the image; the tests run in CI;
+- extracts the Spring Boot layered jar onto `eclipse-temurin:21-jre-alpine`;
+- runs as the non-root user `app` (uid 10001), which owns `/app/data`;
+- sets `-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError`;
+- has a health check on `http://localhost:$PORT/actuator/health`.
+
+### nginx
+
+[`infra/docker/frontend.Dockerfile`](../infra/docker/frontend.Dockerfile) builds on
+`nginxinc/nginx-unprivileged:1.29-alpine`, which runs as non-root on port 8080. The configuration is
+[`infra/nginx/default.conf`](../infra/nginx/default.conf).
+
+- **Only the UI files are served.** The image holds `index.html`, `styles.css` and `js/`. A
+  Dockerfile-specific ignore file keeps `mock/`, `test/`, `package.json` and `README.md` out of the
+  build context, so they are 404. `.js` is served with a JavaScript MIME type, which
+  `<script type="module">` requires.
+- **Two API routes.** `/api/filings` goes to `ingestion-service:8081` and `/api/reports` to
+  `reporting-service:8083`, with the full URI (`/api` is not stripped). Any other `/api/` path is a
+  404 `application/problem+json`.
+- **Upstreams are resolved per request.** `proxy_pass` uses variables and the resolver is Docker's
+  DNS (`127.0.0.11`, valid 10 s). nginx therefore starts even when a service is down, and it follows a
+  restarted container to its new address.
+- **Errors are problem+json.** An upstream 502, 503 or 504 (a stopped or unreachable service) becomes
+  `503 application/problem+json`. A body over 3 MB becomes `413 application/problem+json`.
+- **Body size.** `client_max_body_size 3m`: a filing of 2 MB plus JSON escaping fits, and a content of
+  2 MB + 1 byte reaches Ingestion, which answers 400. The nginx default of 1 MB would answer 413 first.
+- **Headers.** `X-Correlation-Id` is passed to the service and comes back in the response. Every
+  response carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`; the UI files
+  are sent with `Cache-Control: no-cache`.

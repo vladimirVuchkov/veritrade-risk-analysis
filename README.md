@@ -40,31 +40,38 @@ Testcontainers, `node:test`.
 
 ## Quick start
 
-<!-- verify after infra merge -->
 Prerequisites: Docker with Compose v2 (Docker Desktop, or colima on macOS). Java and Node are not
 needed to run the system, because the images build the services themselves.
 
 ```bash
-cp .env.example .env          # optional: change the RabbitMQ credentials and ports
-docker compose up --build
+cp .env.example .env          # optional: change the RabbitMQ credentials and the host ports
+docker compose up --build -d --wait
 ```
 
-<!-- verify after infra merge -->
+`--wait` returns once all five containers (RabbitMQ, the three services and nginx) report healthy.
+Every container has a health check, and the services start in order through
+`depends_on: condition: service_healthy`: the Java services wait for RabbitMQ, and nginx waits for
+Ingestion and Reporting.
+
 | What | Address |
 |---|---|
-| Web UI | http://localhost:8080 |
-| RabbitMQ management | http://localhost:15672 (user and password from `.env`; default `veritrade` / `veritrade`) |
+| Web UI | http://localhost:8080 (`UI_PORT`) |
+| RabbitMQ management | http://localhost:15672 (`RABBITMQ_MANAGEMENT_PORT`); user and password are `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD`, `veritrade` / `veritrade` when no `.env` exists |
 
-Only these two ports are published. Ingestion, Analysis and Reporting are reachable only inside the
-Compose network, through nginx.
+Only these two ports are published. Ingestion (8081), Analysis (8082), Reporting (8083) and AMQP
+(5672) are reachable only inside the Compose network `backend`; the browser reaches the two APIs
+through nginx. Both host ports can be changed in `.env`, and the scripts read the same file. The
+RabbitMQ password takes effect only when the `rabbitmq-data` volume is created, so after changing it
+run `docker compose down -v`.
+
+To stop the stack and remove its volumes (H2 files and broker data): `docker compose down -v`.
 
 In the UI, choose **Load sample** and then submit. The status moves from `SUBMITTED` through
 `ANALYZING` to `COMPLETED`, and the report appears with the findings and highlighted excerpts. A
 longer sample filing is in [`samples/sample-10k-excerpt.txt`](samples/sample-10k-excerpt.txt) and can
 be uploaded as a `.txt` file.
 
-<!-- verify after infra merge -->
-The same through the API:
+The same through the API (nginx forwards `X-Correlation-Id` to the service and back):
 
 ```bash
 curl -i -X POST http://localhost:8080/api/filings \
@@ -104,8 +111,7 @@ Requires Java 21 and a running Docker daemon (Testcontainers starts RabbitMQ).
   RabbitMQ in Testcontainers (`rabbitmq:4.3-management-alpine`), on dynamic ports.
 - Every service also has an ArchUnit test for its layering, and `common-contracts` validates every
   example in `docs/contracts/examples/` against the JSON Schemas.
-- Current count: 650 tests (contracts 29; Ingestion 259 unit and 16 IT; Analysis 183 unit and
-  12 IT; Reporting 134 unit and 17 IT).
+- Current count: 663 tests, including the regression tests for the bugs the end-to-end suite found.
 
 **colima on macOS:** Testcontainers' Ryuk container cannot mount the colima socket path. Point
 Testcontainers at the standard socket:
@@ -124,6 +130,8 @@ What the integration tests cover, among other things:
   and poison messages that reach the `.dlq` without retries;
 - duplicate delivery producing one report, late and contradictory events being acknowledged and not
   dead-lettered, and a transient failure being retried 3 times before the `.dlq`;
+- Ingestion reading analysis events that carry a `__TypeId__` header, as Analysis sends them (see
+  [the `__TypeId__` lesson](#the-__typeid__-header));
 - the topology as seen through the RabbitMQ management API, and the refusal of a redeclaration with
   different arguments.
 
@@ -135,33 +143,131 @@ Requires Node 22 or newer and no `npm install`:
 node --test frontend/test/
 ```
 
-This runs 170 unit tests and an end-to-end test that starts the mock server on a random port and
-drives the full HTTP flow, including the `FAILED`, 400, 404, 413, 500, timeout, network-error and XSS
-paths.
+This runs 188 tests: unit tests of the pure modules (API client, polling, validation, rendering,
+highlighting), and an end-to-end test that starts the mock server on a random port and drives the
+full HTTP flow, including the `FAILED`, 400, 404, 413, 500, retried 503, timeout, network-error and
+XSS paths.
 
 ### Smoke and chaos tests (running system)
 
-<!-- verify after infra merge -->
-With the system running (`docker compose up --build -d`):
+Both scripts need only bash (3.2 or newer, so the macOS default works), curl and, for chaos,
+`docker compose`. They talk to the system through nginx and the RabbitMQ management API only, read
+`.env` for the ports and credentials, print every failed check and exit non-zero on failure. Shared
+helpers are in [`scripts/lib/common.sh`](scripts/lib/common.sh).
 
 ```bash
-scripts/smoke.sh    # submits scripts/demo-filing.json, waits for COMPLETED, checks the report,
-                    # and submits a ~2 MB filing through nginx; exits non-zero on failure
-scripts/chaos.sh    # stops Analysis, submits a filing, starts Analysis again and checks
-                    # that the filing is still processed
+docker compose up --build -d --wait
+scripts/smoke.sh
+scripts/chaos.sh    # all six scenarios; or a subset, for example: scripts/chaos.sh d f
 ```
 
-Both scripts use only bash and curl.
+[`scripts/smoke.sh`](scripts/smoke.sh) checks:
 
-<!-- verify after infra merge -->
-The CI workflow (`.github/workflows/ci.yml`) runs two jobs on every push: `./mvnw -B verify`, then
-`docker compose up --build -d`, `scripts/smoke.sh` and `docker compose down`.
+- the UI: `/` is `text/html`, `/js/app.js` has a JavaScript MIME type, `/styles.css` is `text/css`,
+  and `/mock/`, `/mock/server.js`, `/test/`, `/package.json` and `/README.md` are 404;
+- errors: an invalid and a malformed submit give 400, an unknown filing id and an unknown report id
+  give 404, all as `application/problem+json`;
+- the demo filing [`scripts/demo-filing.json`](scripts/demo-filing.json) (built from the sample
+  10-K excerpt): 202 with a `Location` header, `X-Correlation-Id` returned unchanged, status
+  `COMPLETED` **and** a report with findings, both within 10 s of the submit (each timing is
+  printed);
+- the filing list contains the demo filing;
+- the size limit through nginx: content of exactly 2,097,152 bytes gives 202, and one byte more gives
+  400 problem+json from Ingestion, not 413 from nginx.
+
+When the status is stuck, the script also looks for the filing's events in
+`ingestion.analysis-events.dlq` and says so.
+
+[`scripts/chaos.sh`](scripts/chaos.sh) runs six scenarios. Each prints PASS or FAIL with its
+duration and brings the stack back up afterwards.
+
+| | Scenario | What it checks |
+|---|---|---|
+| (a) | Analysis stopped | Submit while Analysis is stopped. The filing stays `SUBMITTED` for 5 s and the report is 404. After Analysis starts, the filing reaches `COMPLETED` and the report has findings |
+| (b) | Reporting stopped | Submit while Reporting is stopped. The filing reaches `COMPLETED`; the report gives 503 problem+json from nginx. After Reporting starts, the report is 200 |
+| (c) | Duplicate `analysis.completed` | With Analysis stopped, the same `analysis.completed` (same `eventId`, one `CHAOS-001` finding) is published twice through the management API. Reporting logs the second copy as a duplicate, and there is exactly one report with one finding. When Analysis starts, the real result is logged as a late event and ignored; the report is unchanged and nothing is dead-lettered |
+| (d) | Poison message | An invalid body on `filing.submitted` lands in `analysis.filing-submitted.dlq` |
+| (e) | Ingestion restart | Ingestion is restarted right after a submit; the filing still reaches `COMPLETED` with a report (the outbox survives the restart) |
+| (f) | Late `analysis.started` | An `analysis.started` published after `COMPLETED` is logged by Ingestion as late, the status stays `COMPLETED`, and the event is not in `ingestion.analysis-events.dlq` |
+
+(e) uses a graceful restart. The outbox publishes every 500 ms, so the event may already be sent
+before the restart; the scenario shows that nothing is lost across a restart, not that an unsent row
+survives a kill.
+
+The CI workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull
+request, in three jobs:
+
+1. **Build and test:** `./mvnw -B verify` (Java 21), then `node --test frontend/test/` (Node 22).
+2. **Compose smoke and chaos tests** (after the first job): `docker compose up --build -d --wait`,
+   `scripts/smoke.sh`, `scripts/chaos.sh`; on failure it prints `docker compose ps -a` and the
+   service logs; it always ends with `docker compose down -v`.
+3. **End-to-end suite** (`e2e-suite`, after the first job): `./mvnw -B -Pe2e verify -pl e2e-tests -am`
+   on the fixed project name `veritrade-e2e-ci`; on failure it prints the service logs; it always
+   ends with `docker compose down -v`.
 
 ### End-to-end test suite
 
-> **Placeholder (Wave 2).** A dedicated end-to-end suite is added in Wave 2. It covers Analysis
-> down, Reporting down, duplicate delivery, a poison message and an Ingestion restart before the
-> outbox is flushed. This subsection will describe how to run it.
+The Maven module [`e2e-tests/`](e2e-tests/) tests the whole system against the real Compose stack.
+It is built only with the profile `e2e`, so a plain `./mvnw -B verify` skips it. It needs Docker with
+Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is needed.
+
+```bash
+./mvnw -B -Pe2e verify -pl e2e-tests -am     # reports: e2e-tests/target/failsafe-reports
+```
+
+- The suite starts the repository's `docker-compose.yml` once per run (`docker compose up --build
+  --wait`) under its own project name, `veritrade-e2e-<random>`, with both published ports set to `0`.
+  The host ports are random, so it never collides with a `veritrade` stack on 8080 and 15672.
+- It uses the `docker compose` CLI, not Testcontainers, because the scenarios stop and start single
+  services, read their logs and look up a port again after a broker restart.
+- The tests talk to the stack only through nginx and the RabbitMQ management API. REST bodies are
+  validated against the OpenAPI, and every event they publish as valid is validated against its JSON
+  Schema. Waits use Awaitility, with every timeout a named constant in `Timeouts`.
+- At the end the stack is removed with `docker compose down -v`. `-De2e.project=NAME
+  -De2e.keepStack=true` reuses a named stack and leaves it running, for debugging.
+- The management credentials come from `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD` in the
+  environment (default `veritrade`); export them when `.env` has other values.
+- A full run takes about 4 minutes (132 tests, warm image cache). The test classes share one stack
+  and run one after the other; classes that stop a service bring it back afterwards.
+
+| # | Scenario | Test class |
+|---|---|---|
+| 1 | Happy path: `SUBMITTED -> ANALYZING -> COMPLETED`, a consistent report within 10 s | `HappyPathE2E` |
+| 2 | A filing without risk text: `COMPLETED`, `NONE`, no findings | `HappyPathE2E` |
+| 3 | Input validation: blank and missing fields, malformed JSON, 415, the 2 MB limit with ASCII, two-byte characters and emoji, name and title limits in UTF-16 units, 413 over the nginx 3 MB limit | `InputValidationE2E` |
+| 4 | Queries: unknown and malformed ids, every `limit` edge case, newest first | `QueryEdgeCasesE2E` |
+| 5 | Correlation id returned and logged by nginx and all three services | `CorrelationIdE2E` |
+| 6 | Analysis down: the filing stays `SUBMITTED`, then completes | `ServiceOutageE2E` |
+| 7 | Reporting down: `COMPLETED`, report 503 problem+json, report after the restart | `ServiceOutageE2E` |
+| 8 | Ingestion down while analysis events are produced: the status catches up | `ServiceOutageE2E` |
+| 9 | Broker down: the outbox keeps the event, also across an Ingestion restart; the filing completes | `ServiceOutageE2E` |
+| 10 | Duplicates: `analysis.completed`, `analysis.failed`, a redelivered `filing.submitted` | `ControlledAnalysisEventsE2E`, `FilingSubmittedConsumerE2E` |
+| 11 | Out of order and late: completed before started, failed after completed, completed after failed, real results after a restart | `ControlledAnalysisEventsE2E` |
+| 12 | Failure path: `FAILED` with the reason in Ingestion and Reporting | `ControlledAnalysisEventsE2E` |
+| 13 | Poison messages go straight to the matching `.dlq`, valid filings still flow; an event for an unknown filing is dead-lettered | `PoisonMessageE2E` |
+| 14 | A real or bogus `__TypeId__` header is ignored by all three consumers | `ControlledAnalysisEventsE2E`, `FilingSubmittedConsumerE2E` |
+| 15 | Compatibility: unknown fields ignored, a higher `eventVersion`, Reporting's text limits in UTF-16 units | `ControlledAnalysisEventsE2E`, `FilingSubmittedConsumerE2E` |
+| 16 | 30 parallel filings: one consistent report each, empty DLQs | `ConcurrencyE2E` |
+| 17 | UI: MIME types, hidden files, security headers | `StaticUiE2E` |
+| 18 | Topology: exchanges, queues, DLQs, bindings, arguments, consumers with prefetch 10 | `TopologyE2E` |
+
+**The frontend against the real stack.** `FrontendFlowE2E` runs
+[`frontend-flow.test.mjs`](e2e-tests/src/test/node/frontend-flow.test.mjs) with `node --test`. It
+imports the unchanged `frontend/js/api.js`, `polling.js` and `config.js`, points them at nginx and
+drives the submit, the status polling and the report, plus a 400 problem, a 404 report and the recent
+filings list.
+
+The full scenario list, method by method, is in
+[`docs/handoff/agent-f-e2e.md`](docs/handoff/agent-f-e2e.md). The suite found three service bugs; see
+[Lessons from the real stack](#lessons-from-the-real-stack).
+
+### Export tool
+
+The script that exports the AI conversation records has its own tests (7, standard library only):
+
+```bash
+python3 -m unittest discover -s scripts/tests
+```
 
 ## Repository layout
 
@@ -171,9 +277,12 @@ The CI workflow (`.github/workflows/ci.yml`) runs two jobs on every push: `./mvn
 | [`ingestion-service/`](ingestion-service/) | REST intake, filing status, outbox publisher |
 | [`analysis-service/`](analysis-service/) | rule engine and `risk-rules.yml` |
 | [`reporting-service/`](reporting-service/) | reports, idempotency, REST read API |
+| [`e2e-tests/`](e2e-tests/) | end-to-end suite against the real Compose stack (profile `e2e`) |
 | [`frontend/`](frontend/) | plain HTML/JS UI, mock server, `node:test` tests |
-| [`infra/`](infra/) | Dockerfiles and nginx configuration |
-| `scripts/` | smoke and chaos tests, AI conversation export |
+| [`infra/`](infra/) | [`java-service.Dockerfile`](infra/docker/java-service.Dockerfile) (one for all three services), [`frontend.Dockerfile`](infra/docker/frontend.Dockerfile), nginx [`default.conf`](infra/nginx/default.conf) |
+| [`docker-compose.yml`](docker-compose.yml), [`.env.example`](.env.example) | the full stack; host ports and RabbitMQ credentials |
+| [`scripts/`](scripts/) | [`smoke.sh`](scripts/smoke.sh), [`chaos.sh`](scripts/chaos.sh), [`demo-filing.json`](scripts/demo-filing.json), AI conversation export and its tests in [`scripts/tests/`](scripts/tests/) |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Maven and frontend tests, then Compose smoke and chaos tests and the end-to-end suite |
 | [`samples/`](samples/) | sample filing |
 | [`docs/contracts/`](docs/contracts/) | JSON Schemas, examples, OpenAPI, messaging topology |
 | [`docs/decisions/`](docs/decisions/) | architecture decision records |
@@ -214,11 +323,20 @@ records and the JSON Schemas in step.
 | Down | What happens | After recovery |
 |---|---|---|
 | **Analysis** | Intake works. `filing.submitted` waits in the durable `analysis.filing-submitted` queue. Filings stay `SUBMITTED`; the UI stops polling after its limit (30 polls, 2 s apart) with a timeout message | Analysis consumes the backlog, and the filings complete |
-| **Reporting** | Analysis results wait in `reporting.analysis-results`. The status still reaches `COMPLETED`, but `/api/reports/{id}` returns 404 (or 502 from nginx), so the UI times out on the report | Reporting stores the reports; reopening the filing in the UI shows the report |
-| **Ingestion** | No new filings can be submitted, and the status cannot be read. Analysis events wait in `ingestion.analysis-events`. Reporting keeps serving reports | Unpublished outbox rows are sent on the first run, and the waiting events update the status |
-| **RabbitMQ** | Ingestion still accepts filings: the outbox rows stay unpublished and the publisher tries again every 500 ms. Listeners reconnect automatically | The outbox drains in order; durable queues and persistent messages survive a broker restart (data volume) |
+| **Reporting** | Analysis results wait in `reporting.analysis-results`. The status still reaches `COMPLETED`, but nginx answers `/api/reports/{id}` with 503 `application/problem+json`. The UI retries; if Reporting stays down for more than 3 polls in a row, it shows "Service unavailable" | Reporting stores the reports; reopening the filing in the UI shows the report |
+| **Ingestion** | No new filings can be submitted, and the status cannot be read (nginx answers 503 problem+json). Analysis events wait in `ingestion.analysis-events`. Reporting keeps serving reports | Unpublished outbox rows are sent on the first run, and the waiting events update the status |
+| **RabbitMQ** | Ingestion still accepts filings: the outbox rows stay unpublished and the publisher tries again every 500 ms. Listeners reconnect automatically. A 2 s connection timeout keeps a service stop graceful during the outage | The outbox drains in order; durable queues and persistent messages survive a broker restart (data volume) |
 
 No queue has a TTL or a length limit, so a message waits as long as its consumer is down.
+
+**nginx and the UI during an outage.** nginx resolves the service names through Docker DNS on every
+request, so it starts even when a service is down and follows a restarted container to its new
+address. A stopped service gives a `503 application/problem+json`, never an HTML error page. The UI
+treats 502, 503 and 504 like a network error: it keeps polling, and gives up with a "Service
+unavailable" message only after more than 3 such errors in a row (`maxConsecutiveTransientErrors`
+in [`frontend/js/config.js`](frontend/js/config.js)). A short restart therefore does not break the
+flow. Scenarios (a), (b) and (e) of [`scripts/chaos.sh`](scripts/chaos.sh) check the
+service-down rows of the table above against the running stack.
 
 ### Idempotency
 
@@ -285,6 +403,56 @@ Dead letters go through the direct exchange `veritrade.dlx`, with the work queue
 key. Nothing consumes the dead-letter queues; they are inspected (and can be moved back) in the
 RabbitMQ management UI.
 
+### Lessons from the real stack
+
+All unit and Testcontainers tests were green each time. These bugs were found only when the real
+services ran together in Compose: first by `scripts/smoke.sh` and `scripts/chaos.sh`, then by the
+end-to-end suite.
+
+#### The `__TypeId__` header
+
+The contract says that consumers dispatch on the envelope's `eventType` and never on Spring's
+`__TypeId__` header. Analysis publishes with `JacksonJsonMessageConverter`, which adds that header.
+In Wave 1 Ingestion declared its JSON converter as a `MessageConverter` bean. Spring Boot also gives
+such a bean to the listener container, so the container converted every incoming body by
+`__TypeId__` before Ingestion's own reader saw it. The class named in the header is not in the
+converter's trusted packages, so every `analysis.started` and `analysis.completed` went to
+`ingestion.analysis-events.dlq` after 3 attempts, and every filing stayed `SUBMITTED`. The
+integration tests passed because their test messages had no `__TypeId__` header; the first Compose
+run of the smoke and chaos scripts found it.
+
+The end-to-end suite then found the same pattern in Analysis: a valid `filing.submitted` with a
+`__TypeId__` header ended as a `FAILED` report, and unreadable JSON was retried 3 times before it
+reached the DLQ, instead of going there at once.
+
+The fix is the same in both: **Analysis and Ingestion put the JSON converter only on the
+`RabbitTemplate`** (a `RabbitTemplateCustomizer`), so the listener gets the raw message, the service's
+reader dispatches on `eventType`, and `__TypeId__` is ignored. Reporting never had a converter bean.
+Integration tests in both services now publish with a `__TypeId__` header, and the end-to-end suite
+sends a real and a bogus header to all three consumers.
+
+#### Text limits in Reporting
+
+The contract counts length limits in UTF-16 code units, but Reporting validated incoming events in
+code points, so 250 emoji plus one character (501 units) passed as `matchedText` and was cut to 500
+units without notice. **Reporting now validates lengths in UTF-16 units** (`String.length()`), and
+rejects such an event to the DLQ.
+
+#### A shutdown during a broker outage lost H2 data
+
+While the RabbitMQ container is stopped, a connection attempt to its old address hangs until the
+connection timeout, 60 s by default. Stopping Ingestion in that state took longer than Docker's 10 s
+stop grace period, so the container was killed (exit 137), and H2 came back without its most recent
+commits: filings accepted with 202 were then 404. **The fix is `spring.rabbitmq.connection-timeout:
+2s` in Ingestion and Reporting**, the two services with H2. The same stop is now graceful (about
+4 s). A regression test in each service checks the property, and the end-to-end broker-outage scenario
+checks that the accepted filing survives the restart. H2 can still lose recent commits on a hard kill
+(see [Known limitations](#known-limitations)).
+
+**The lesson:** tests that build their own messages agree with the code that reads them. Only a run
+with the real producers, the real containers and real outages checks the agreement between services,
+which is why CI runs the smoke and chaos scripts and the end-to-end suite after the Maven build.
+
 ### Limitations of this design
 
 - A poison `filing.submitted` leaves the filing `SUBMITTED` for good. Nothing detects stuck filings
@@ -345,8 +513,9 @@ The project was built with **Claude Code** (CLI, model Claude Opus 5.5).
 
 The orchestrator froze the contract first, gave each agent one folder, and merged their branches.
 The agents reported problems back instead of working around the contract. Examples are the removed
-`max-attempts` retry property in Spring Boot 4.1, the H2 2.4.240 CHECK-constraint bug, and code points
-versus UTF-16 units in the length limits. The orchestrator then fixed the contract or the build for
+`max-attempts` retry property in Spring Boot 4.1, the H2 2.4.240 CHECK-constraint bug, code points
+versus UTF-16 units in the length limits, and the Ingestion `__TypeId__` bug that the infrastructure
+agent's Compose run found and reported instead of patching. The orchestrator then fixed the contract or the build for
 everyone. Each agent left a handoff note in [`docs/handoff/`](docs/handoff/).
 
 - Readable account of the process: [`docs/ai-process-log.md`](docs/ai-process-log.md)
@@ -364,8 +533,13 @@ Collected from the handoff notes of all agents.
   in the parent `pom.xml`.
 - **Length limits count UTF-16 code units**, the unit of the database columns. A character outside the
   Basic Multilingual Plane, such as an emoji, counts as two, so a company name of 101 emoji is
-  rejected although it is only 101 characters. The contract says so. Reporting validates incoming
-  events in code points and then shortens text to the column size without splitting a surrogate pair.
+  rejected although it is only 101 characters. The contract says so, and all three services count
+  this way; Reporting was changed from code points in Wave 2. The JSON Schemas use `maxLength`, which
+  counts code points, so a schema validator accepts some emoji texts that Reporting rejects.
+- **H2 can lose recent commits on a hard kill.** A `docker kill`, an out-of-memory kill or a stop that
+  exceeds Docker's 10 s grace period can bring H2 back without its last commits. The 2 s broker
+  connection timeout keeps the normal stop graceful, even during a broker outage; production would
+  use PostgreSQL.
 - The filing text (up to 2 MB) travels inside `filing.submitted` and is stored in the outbox row.
 
 **Messaging**
@@ -377,6 +551,9 @@ Collected from the handoff notes of all agents.
   `RiskCategory` cannot be read by the contract records. Adding an enum value is therefore a breaking
   change that needs a new `eventVersion`.
 - Reporting dead-letters an event with `eventVersion` above 1, so it can be replayed after an upgrade.
+  Ingestion and Analysis process such an event (they read the fields they know), so a version 2
+  `analysis.completed` gives a `COMPLETED` filing without a report. The contract does not yet say what
+  consumers must do.
 - On every listener retry Analysis publishes `analysis.started` again with the same `eventId`;
   consumers drop the repeat.
 - Until Analysis has declared its queue, `filing.submitted` is unroutable. It is returned and stays in
@@ -391,10 +568,15 @@ Collected from the handoff notes of all agents.
 - `generatedAt` in a report is the time Reporting stored it, not the analysis time.
 - An empty `?limit=` on `GET /api/filings` means the default (20).
 - The UI gives up after 30 status polls and 15 report polls (2 s apart) and shows a timeout message.
+  It retries 502, 503, 504 and network errors, but stops after more than 3 of them in a row.
 - The excerpt does not say where it starts in the filing, so the UI finds the highlight with a
   heuristic (based on the 120-character context). If none fits, the excerpt is shown without a
   highlight.
 - `frontend/js/app.js` (DOM wiring only) has no automated test; it was checked by hand.
+- nginx sets no Content-Security-Policy header yet.
+- Right after a service container stops, the first request to it through nginx can hang for about
+  20 s before the 503 (nginx caches the address for 10 s and uses the default 60 s connect timeout).
+  Later requests get 503 at once. The UI polling survives it.
 
 **Analysis**
 - Matching is regex over the whole text in memory: about 1 s for 2 MB. Much larger filings would need
@@ -403,6 +585,10 @@ Collected from the handoff notes of all agents.
 **Environment**
 - On macOS with colima, the integration tests need
   `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`.
+- `RABBITMQ_PASSWORD` takes effect only when the `rabbitmq-data` volume is created; after changing it,
+  run `docker compose down -v`.
+- The smoke and chaos scripts need host ports 8080 and 15672 (or the ones set in `.env`). On macOS
+  without GNU `date` they use `perl` for millisecond timings, or whole seconds without it.
 - RabbitMQ 4.3 refuses transient non-exclusive queues, so the test capture queues are durable and
   deleted after each test. The management API shows a server-added `x-queue-type: classic` argument
   that the services do not declare.

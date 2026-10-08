@@ -13,8 +13,11 @@ import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.boot.retry.RetryPolicySettings;
+import tools.jackson.databind.json.JsonMapper;
 
 class RabbitConfigTest {
 
@@ -81,5 +84,14 @@ class RabbitConfigTest {
         assertThat(retryable.test(new InvalidFilingMessageException("bad"))).isFalse();
         assertThat(retryable.test(new ListenerExecutionFailedException("x",
                 new IllegalStateException("engine"), message))).isTrue();
+    }
+
+    @Test
+    void putsTheJsonConverterOnTheTemplateOnly() {
+        RabbitTemplate template = new RabbitTemplate();
+
+        config.jsonTemplateConverter(JsonMapper.builder().build()).customize(template);
+
+        assertThat(template.getMessageConverter()).isInstanceOf(JacksonJsonMessageConverter.class);
     }
 }

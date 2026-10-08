@@ -20,3 +20,7 @@ backend APIs.
   instead.
 - nginx must accept request bodies of up to 3 MB (`client_max_body_size 3m`). Its 1 MB default would
   reject a 2 MB filing with 413.
+- nginx is part of the failure handling: it resolves the services per request through Docker DNS, so
+  it starts without them and follows a restarted container, and it answers a stopped service with
+  `503 application/problem+json`. The UI retries 502, 503 and 504 a limited number of times. The
+  configuration is [`infra/nginx/default.conf`](../../infra/nginx/default.conf).
