@@ -32,6 +32,9 @@
              Flyway, H2, JUnit, Mockito, AssertJ and Testcontainers. -->
         <archunit.version>1.5.1</archunit.version>
         <json-schema-validator.version>3.0.8</json-schema-validator.version>
+        <!-- Overrides the Boot-managed 2.4.240: in 2.4.240 a CHECK constraint fails every insert once the
+             connection that created it is closed ("Check constraint invalid"). -->
+        <h2.version>2.3.232</h2.version>
     </properties>
 
     <dependencyManagement>

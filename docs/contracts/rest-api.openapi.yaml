@@ -8,6 +8,9 @@ info:
     Errors use RFC 9457 Problem Details (application/problem+json).
     An optional X-Correlation-Id request header is propagated through all events; when absent,
     Ingestion generates one and returns it in the response header.
+    String maxLength values in this API and in the event schemas count UTF-16 code units (the unit of
+    the database columns), so a character outside the Basic Multilingual Plane, such as an emoji,
+    counts as two.
 servers:
   - url: http://localhost:8080
     description: Through the nginx reverse proxy

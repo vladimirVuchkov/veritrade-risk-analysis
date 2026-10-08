@@ -1,0 +1,7 @@
+rulesVersion: "test-2"
+rules:
+  - id: TEST-001
+    category: MARKET
+    severity: LOW
+    patterns:
+      - 'risk'

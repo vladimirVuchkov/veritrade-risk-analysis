@@ -44,6 +44,29 @@ parallel, each in its own folder and git worktree, against a contract frozen in 
 
 _Entries are collected from the handoff notes in `handoff/`._
 
+#### [2] 2026-10-08 - Wave 1 - Orchestrator with agents A, B, C, D, E and G
+- **Goal:** implement the three services, the UI, the infrastructure and the documentation in parallel (plan tasks A1-A6, B1-B5, C1-C5, D1-D5, E1-E7, G), then merge and verify the whole system.
+- **Tool and model:** Claude Code (Claude Opus 5.5); one orchestrator session with one subagent per agent, each in its own git worktree and branch, two agents running at a time.
+- **Given to the AI:** per agent, the ownership rules, the frozen contract, the plan tasks and a hard requirement for edge-case unit tests and integration tests. Raw record: exported by the orchestrator from its session (subagent transcripts included). Agent details: [`handoff/agent-a-ingestion.md`](handoff/agent-a-ingestion.md), [`handoff/agent-b-analysis.md`](handoff/agent-b-analysis.md), [`handoff/agent-c-reporting.md`](handoff/agent-c-reporting.md), [`handoff/agent-d-frontend.md`](handoff/agent-d-frontend.md), [`handoff/agent-e-infra.md`](handoff/agent-e-infra.md), [`handoff/agent-g-docs.md`](handoff/agent-g-docs.md).
+- **Received:**
+  - Ingestion: REST API with ProblemDetail errors, transactional outbox with publisher confirms, status state machine with the late-event rule.
+  - Analysis: 33 YAML rules validated at startup, pure rule engine, the two failure paths (DLQ at once / `analysis.failed` after 3 attempts).
+  - Reporting: idempotent report store (`processed_events`), first terminal event wins, report API.
+  - Frontend: plain ES modules, polling flow, safe highlighting (no `innerHTML`), dependency-free mock server.
+  - Infrastructure: service and nginx images, Compose with health checks, `smoke.sh`, `chaos.sh` (six resilience scenarios), CI workflow.
+  - Documentation: README, `architecture.md` with Mermaid diagrams, ADRs 0001-0010.
+- **My intervention:** _to be completed_
+- **Decision:** _to be completed_
+- **Verification:** every agent branch re-verified independently by the orchestrator, then merged into `integration/wave1`; `./mvnw -B verify` green (654 tests: contracts 29, Ingestion 259 + 20 IT, Analysis 183 + 12 IT, Reporting 134 + 17 IT); `node --test frontend/test/` 188/188; `docker compose up --build -d --wait` all five containers healthy; `scripts/smoke.sh` passed (report 950 ms after submit, limit 10 s); `scripts/chaos.sh` six of six scenarios passed.
+- **Problems/lessons:**
+  - Spring Boot 4.1 removed `spring.rabbitmq.listener.simple.retry.max-attempts` without a warning; Agent B found it and every service now uses `max-retries: 2` (3 attempts), asserted by an integration test.
+  - H2 2.4.240 fails every insert into a table with a CHECK constraint once the connection that created it is closed. Reproduced by the orchestrator with a minimal JDBC program; H2 is pinned to 2.3.232 in the parent pom.
+  - The contract `maxLength` values were ambiguous (code points vs UTF-16 units of the columns); the OpenAPI now states UTF-16 code units.
+  - The merged build exposed a race in an Ingestion outbox integration test (the rejecting test queue was removed before the recovery queue was bound); fixed in the test.
+  - The Compose chaos run found a real bug that all unit and integration tests missed: Ingestion's JSON converter bean was applied to the listener container and rejected every analysis event by its `__TypeId__` header, so filings stayed `SUBMITTED`. Agent A fixed it and added integration tests that publish with the header.
+  - The UI treated a 503 from nginx (Reporting restarting) as a final error; Agent D made 502/503/504 retryable within a limit.
+  - Testcontainers on macOS with colima needs `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`; documented in the README.
+
 ### W2 - Integration
 
 ### W3 - Review and delivery

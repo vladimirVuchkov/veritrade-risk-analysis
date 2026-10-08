@@ -1,0 +1,10 @@
+{
+  "name": "veritrade-frontend",
+  "private": true,
+  "description": "Marks the .js files as ES modules for the Node tests and the mock server. No dependencies, no build.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/",
+    "mock": "node mock/server.js"
+  }
+}

@@ -29,7 +29,7 @@ spring:
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          max-retries: 2
           initial-interval: 1s
           multiplier: 2
           max-interval: 5s
@@ -47,3 +47,20 @@ management:
 logging:
   pattern:
     correlation: "[%X{correlationId:-}] "
+
+ingestion:
+  filing:
+    max-content-bytes: 2097152
+    max-company-name-length: 200
+    max-title-length: 300
+    max-failure-reason-length: 1000
+  listing:
+    default-limit: 20
+    max-limit: 100
+  correlation-id:
+    max-length: 128
+  outbox:
+    enabled: true
+    publish-interval: 500ms
+    batch-size: 20
+    confirm-timeout: 5s

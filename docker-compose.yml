@@ -1,20 +1,33 @@
 name: veritrade
 
+# Only the UI (nginx) and the RabbitMQ management UI are published to the host.
+# The services talk to each other on the single "backend" network.
+
+x-java-healthcheck: &java-healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 5
+  start_period: 90s
+  start_interval: 2s
+
 x-java-service: &java-service
   restart: unless-stopped
-  environment: &rabbit-env
-    RABBITMQ_HOST: rabbitmq
-    RABBITMQ_PORT: 5672
-    RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-veritrade}
-    RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-veritrade}
   depends_on:
     rabbitmq:
       condition: service_healthy
   networks: [backend]
 
+x-rabbit-env: &rabbit-env
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-veritrade}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-veritrade}
+
 services:
   rabbitmq:
     image: rabbitmq:4.3-management-alpine
+    restart: unless-stopped
+    hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-veritrade}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-veritrade}
@@ -25,9 +38,10 @@ services:
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 10
-      start_period: 20s
+      start_period: 60s
+      start_interval: 2s
     networks: [backend]
 
   ingestion-service:
@@ -43,6 +57,9 @@ services:
       INGESTION_DB_URL: jdbc:h2:file:/app/data/ingestion
     volumes:
       - ingestion-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health > /dev/null || exit 1"]
+      <<: *java-healthcheck
 
   analysis-service:
     <<: *java-service
@@ -52,6 +69,11 @@ services:
       args:
         SERVICE: analysis-service
         PORT: 8082
+    environment:
+      <<: *rabbit-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health > /dev/null || exit 1"]
+      <<: *java-healthcheck
 
   reporting-service:
     <<: *java-service
@@ -66,6 +88,30 @@ services:
       REPORTING_DB_URL: jdbc:h2:file:/app/data/reporting
     volumes:
       - reporting-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health > /dev/null || exit 1"]
+      <<: *java-healthcheck
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    depends_on:
+      ingestion-service:
+        condition: service_healthy
+      reporting-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+      start_interval: 2s
+    networks: [backend]
 
 volumes:
   rabbitmq-data:

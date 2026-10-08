@@ -1,0 +1,210 @@
+# Risk rules applied to every filing.
+#
+# Each rule has an id (upper-case prefix, '-', three digits), a category, a severity and one or more
+# Java regular expressions. Patterns are matched case-insensitively. Write them in single quotes so
+# backslashes stay literal; a single quote inside a pattern is written twice ('').
+# The service validates this file at startup and refuses to start if anything is wrong.
+# Change rulesVersion whenever a rule changes: it is reported with every analysis result.
+
+rulesVersion: "1.0"
+
+rules:
+  # FINANCIAL
+  - id: FIN-001
+    category: FINANCIAL
+    severity: CRITICAL
+    patterns:
+      - 'substantial doubt about (?:our|the company''s) ability to continue as a going concern'
+      - 'going concern'
+  - id: FIN-002
+    category: FINANCIAL
+    severity: HIGH
+    patterns:
+      - 'material weakness(?:es)?'
+  - id: FIN-003
+    category: FINANCIAL
+    severity: HIGH
+    patterns:
+      - '(?:breach|default|violation) of (?:our |the )?(?:financial )?covenants?'
+      - 'event of default'
+  - id: FIN-004
+    category: FINANCIAL
+    severity: MEDIUM
+    patterns:
+      - 'goodwill impairment'
+      - 'impairment (?:charges?|losses?)'
+  - id: FIN-005
+    category: FINANCIAL
+    severity: HIGH
+    patterns:
+      - 'restate(?:d|ment of) (?:our |the )?(?:previously issued )?(?:consolidated )?financial statements'
+  - id: FIN-006
+    category: FINANCIAL
+    severity: MEDIUM
+    patterns:
+      - '(?:limited|insufficient) liquidity'
+      - 'unable to (?:obtain|raise) (?:additional )?(?:financing|capital)'
+  - id: FIN-007
+    category: FINANCIAL
+    severity: LOW
+    patterns:
+      - 'substantial (?:amount of )?indebtedness'
+      - 'highly leveraged'
+  - id: FIN-008
+    category: FINANCIAL
+    severity: CRITICAL
+    patterns:
+      - 'petitions? for (?:relief under )?Chapter 11'
+      - 'file for bankruptcy(?: protection)?'
+
+  # LEGAL
+  - id: LEGAL-001
+    category: LEGAL
+    severity: HIGH
+    patterns:
+      - 'pending litigation'
+      - '(?:securities )?class action (?:lawsuits?|complaints?)'
+  - id: LEGAL-002
+    category: LEGAL
+    severity: HIGH
+    patterns:
+      - 'adverse (?:judgments?|verdicts?|rulings?)'
+  - id: LEGAL-003
+    category: LEGAL
+    severity: MEDIUM
+    patterns:
+      - 'intellectual property (?:litigation|claims?|disputes?)'
+      - 'claims? of infringement'
+  - id: LEGAL-004
+    category: LEGAL
+    severity: MEDIUM
+    patterns:
+      - 'product liability (?:claims?|lawsuits?)'
+  - id: LEGAL-005
+    category: LEGAL
+    severity: LOW
+    patterns:
+      - 'legal proceedings'
+
+  # OPERATIONAL
+  - id: OPS-001
+    category: OPERATIONAL
+    severity: HIGH
+    patterns:
+      - 'supply chain disruptions?'
+  - id: OPS-002
+    category: OPERATIONAL
+    severity: MEDIUM
+    patterns:
+      - '(?:single|sole)[- ]source suppliers?'
+      - 'limited number of suppliers'
+  - id: OPS-003
+    category: OPERATIONAL
+    severity: MEDIUM
+    patterns:
+      - 'loss of key (?:personnel|employees|executives)'
+  - id: OPS-004
+    category: OPERATIONAL
+    severity: MEDIUM
+    patterns:
+      - 'natural disasters?'
+      - '\bpandemics?\b'
+  - id: OPS-005
+    category: OPERATIONAL
+    severity: HIGH
+    patterns:
+      - 'product recalls?'
+      - 'manufacturing (?:defects?|disruptions?)'
+
+  # CYBERSECURITY
+  - id: CYBER-001
+    category: CYBERSECURITY
+    severity: HIGH
+    patterns:
+      - 'cyber(?:security)?[- ]?(?:incidents?|attacks?)'
+      - 'ransomware(?: attacks?)?'
+  - id: CYBER-002
+    category: CYBERSECURITY
+    severity: HIGH
+    patterns:
+      - 'data breach(?:es)?'
+      - 'unauthorized access to (?:our |customer |personal )?(?:data|information|systems)'
+  - id: CYBER-003
+    category: CYBERSECURITY
+    severity: MEDIUM
+    patterns:
+      - '\bphishing\b'
+      - '\bmalware\b'
+      - 'denial[- ]of[- ]service'
+  - id: CYBER-004
+    category: CYBERSECURITY
+    severity: LOW
+    patterns:
+      - '(?:information technology|IT) systems? (?:failures?|outages?|disruptions?)'
+
+  # REGULATORY
+  - id: REG-001
+    category: REGULATORY
+    severity: HIGH
+    patterns:
+      - '(?:regulatory|government(?:al)?|SEC) investigations?'
+  - id: REG-002
+    category: REGULATORY
+    severity: HIGH
+    patterns:
+      - 'Wells notice'
+      - 'consent decree'
+  - id: REG-003
+    category: REGULATORY
+    severity: MEDIUM
+    patterns:
+      - 'Foreign Corrupt Practices Act'
+      - 'anti-?bribery laws'
+  - id: REG-004
+    category: REGULATORY
+    severity: MEDIUM
+    patterns:
+      - 'export control (?:laws|regulations)'
+      - 'economic sanctions'
+  - id: REG-005
+    category: REGULATORY
+    severity: LOW
+    patterns:
+      - 'changes in (?:tax )?(?:laws|regulations)'
+      - 'data (?:privacy|protection) (?:laws|regulations)'
+
+  # MARKET
+  - id: MKT-001
+    category: MARKET
+    severity: MEDIUM
+    patterns:
+      - '(?:intense|significant|increased) competition'
+  - id: MKT-002
+    category: MARKET
+    severity: MEDIUM
+    patterns:
+      - 'market price of our (?:common )?stock (?:may|could) (?:be volatile|fluctuate|decline)'
+      - 'stock price volatility'
+  - id: MKT-003
+    category: MARKET
+    severity: MEDIUM
+    patterns:
+      - 'foreign (?:currency|exchange) (?:rate )?(?:fluctuations?|risks?)'
+  - id: MKT-004
+    category: MARKET
+    severity: HIGH
+    patterns:
+      - 'economic downturns?'
+      - '\brecession\b'
+  - id: MKT-005
+    category: MARKET
+    severity: LOW
+    patterns:
+      - 'interest rate (?:risks?|fluctuations?|increases?)'
+      - 'inflationary pressures?'
+  - id: MKT-006
+    category: MARKET
+    severity: HIGH
+    patterns:
+      - 'loss of (?:a |one or more )?(?:significant|major|key) customers?'
+      - 'customer concentration'

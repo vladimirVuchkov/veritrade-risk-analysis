@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Submit financial filings and review their risk analysis reports.">
+  <title>VeriTrade Risk Analysis</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <h1>VeriTrade Risk Analysis</h1>
+    <p class="tagline">Submit a filing, follow its analysis and review the risk report.</p>
+  </header>
+
+  <main id="main" class="layout">
+    <section class="panel" aria-labelledby="submit-heading">
+      <h2 id="submit-heading">Submit a filing</h2>
+      <noscript><p class="message tone-error">This page needs JavaScript enabled.</p></noscript>
+      <form id="filing-form" novalidate>
+        <div class="field">
+          <label for="company-name">Company name <span class="required" aria-hidden="true">*</span></label>
+          <input id="company-name" name="companyName" type="text" autocomplete="organization"
+                 required maxlength="200" aria-describedby="company-name-error">
+          <p id="company-name-error" class="field-error" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <label for="filing-title">Title <span class="required" aria-hidden="true">*</span></label>
+          <input id="filing-title" name="title" type="text" required maxlength="300"
+                 aria-describedby="filing-title-error">
+          <p id="filing-title-error" class="field-error" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <label for="filing-content">Filing text <span class="required" aria-hidden="true">*</span></label>
+          <textarea id="filing-content" name="content" rows="12" required spellcheck="false"
+                    aria-describedby="filing-content-help filing-content-size filing-content-error"></textarea>
+          <p id="filing-content-help" class="help">Paste the text or upload a .txt file. Maximum 2 MB (UTF-8).</p>
+          <p id="filing-content-size" class="help" aria-live="polite"></p>
+          <p id="filing-content-error" class="field-error" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <label for="filing-file">Upload a .txt file</label>
+          <input id="filing-file" name="file" type="file" accept=".txt,text/plain">
+        </div>
+
+        <div class="actions">
+          <button id="load-sample" type="button" class="secondary">Load sample</button>
+          <button id="submit-button" type="submit">Submit for analysis</button>
+        </div>
+        <div id="form-message" class="form-message"></div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="result-heading">
+      <h2 id="result-heading">Analysis</h2>
+      <div id="progress" aria-live="polite">
+        <p class="empty">Submit a filing or open one from the list to see its report.</p>
+      </div>
+      <div id="report" tabindex="-1"></div>
+    </section>
+
+    <section class="panel panel-wide" aria-labelledby="filings-heading">
+      <div class="panel-header">
+        <h2 id="filings-heading">Recent filings</h2>
+        <button id="refresh-filings" type="button" class="secondary">Refresh</button>
+      </div>
+      <div id="filings" aria-live="polite"></div>
+    </section>
+  </main>
+</body>
+</html>

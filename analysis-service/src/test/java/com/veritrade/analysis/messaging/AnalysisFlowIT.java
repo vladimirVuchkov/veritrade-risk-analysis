@@ -1,0 +1,155 @@
+package com.veritrade.analysis.messaging;
+
+import static com.veritrade.analysis.support.TestMessages.filingSubmitted;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import com.veritrade.analysis.support.ContractFixtures;
+import com.veritrade.analysis.support.RabbitIntegrationTest;
+import com.veritrade.contracts.event.EventType;
+import com.veritrade.contracts.messaging.EventIds;
+import com.veritrade.contracts.messaging.MessagingTopology;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+
+class AnalysisFlowIT extends RabbitIntegrationTest {
+
+    private static final String CORRELATION_ID = "c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20";
+
+    @MockitoSpyBean
+    private FilingSubmittedReader reader;
+
+    @BeforeEach
+    void resetSpy() {
+        clearInvocations(reader);
+    }
+
+    @Test
+    void publishesStartedAndCompletedThatMatchTheSchemas() {
+        UUID filingId = UUID.randomUUID();
+
+        sendFilingSubmitted(filingSubmitted(filingId).toString());
+
+        Message started = receive(CAPTURE_QUEUE);
+        Message completed = receive(CAPTURE_QUEUE);
+        assertEvent(started, EventType.ANALYSIS_STARTED, filingId);
+        assertEvent(completed, EventType.ANALYSIS_COMPLETED, filingId);
+        JsonNode summary = json(completed).get("payload").get("summary");
+        assertThat(summary.get("totalFindings").asInt()).isEqualTo(3);
+        assertThat(summary.get("overallRiskLevel").asString()).isEqualTo("HIGH");
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void processesTheContractExampleIntoTheContractResult() {
+        sendFilingSubmitted(ContractFixtures.example(EventType.FILING_SUBMITTED).toString());
+
+        receive(CAPTURE_QUEUE);
+        JsonNode completed = json(receive(CAPTURE_QUEUE));
+
+        JsonNode expected = ContractFixtures.example(EventType.ANALYSIS_COMPLETED);
+        assertThat(completed.get("eventId")).isEqualTo(expected.get("eventId"));
+        assertThat(completed.get("payload").get("findings")).isEqualTo(expected.get("payload").get("findings"));
+        assertThat(completed.get("payload").get("summary")).isEqualTo(expected.get("payload").get("summary"));
+        assertThat(completed.get("payload").get("rulesVersion")).isEqualTo(expected.get("payload").get("rulesVersion"));
+    }
+
+    @Test
+    void sendsAnUnreadableMessageToTheDeadLetterQueueWithoutRetries() {
+        sendFilingSubmitted("{\"eventType\": \"FILING_SUBMITTED\", \"payload\": {broken");
+
+        Message dead = receive(DEAD_LETTER_QUEUE);
+
+        assertThat(new String(dead.getBody())).contains("broken");
+        assertRejectedOnce(dead);
+        verify(reader, times(1)).read(any());
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void sendsAnEventWithMissingFieldsToTheDeadLetterQueueWithoutRetries() {
+        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        ((ObjectNode) event.get("payload")).remove("content");
+
+        sendFilingSubmitted(event.toString());
+
+        assertRejectedOnce(receive(DEAD_LETTER_QUEUE));
+        verify(reader, times(1)).read(any());
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void sendsAWrongEventTypeToTheDeadLetterQueue() {
+        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        event.put("eventType", "ANALYSIS_COMPLETED");
+
+        sendFilingSubmitted(event.toString());
+
+        assertRejectedOnce(receive(DEAD_LETTER_QUEUE));
+        assertNoMoreMessages(CAPTURE_QUEUE);
+    }
+
+    @Test
+    void aDuplicateDeliveryRepublishesEventsWithTheSameIds() {
+        String body = filingSubmitted(UUID.randomUUID()).toString();
+
+        sendFilingSubmitted(body);
+        List<Message> first = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
+        sendFilingSubmitted(body);
+        List<Message> second = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
+
+        assertThat(second).extracting(m -> m.getMessageProperties().getMessageId())
+                .isEqualTo(first.stream().map(m -> m.getMessageProperties().getMessageId()).toList());
+        assertThat(json(second.getLast()).get("payload").get("findings"))
+                .isEqualTo(json(first.getLast()).get("payload").get("findings"));
+    }
+
+    @Test
+    void ignoresUnknownFieldsInTheIncomingEvent() {
+        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        event.put("addedLater", true);
+        ((ObjectNode) event.get("payload")).put("industry", "Retail");
+
+        sendFilingSubmitted(event.toString());
+
+        assertThat(eventType(receive(CAPTURE_QUEUE))).isEqualTo(EventType.ANALYSIS_STARTED);
+        assertThat(eventType(receive(CAPTURE_QUEUE))).isEqualTo(EventType.ANALYSIS_COMPLETED);
+    }
+
+    private static void assertEvent(Message message, EventType type, UUID filingId) {
+        JsonNode event = json(message);
+        MessageProperties properties = message.getMessageProperties();
+        String eventId = EventIds.forFiling(filingId, type).toString();
+        assertThat(ContractFixtures.validate(type, event)).isEmpty();
+        assertThat(event.get("eventType").asString()).isEqualTo(type.name());
+        assertThat(event.get("eventId").asString()).isEqualTo(eventId);
+        assertThat(event.get("payload").get("filingId").asString()).isEqualTo(filingId.toString());
+        assertThat(properties.getReceivedRoutingKey()).isEqualTo(type.routingKey());
+        assertThat(properties.getMessageId()).isEqualTo(eventId);
+        assertThat(properties.getContentType()).isEqualTo(MessageProperties.CONTENT_TYPE_JSON);
+        assertThat(properties.getCorrelationId()).isEqualTo(CORRELATION_ID);
+        assertThat(properties.getReceivedDeliveryMode()).isEqualTo(MessageDeliveryMode.PERSISTENT);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertRejectedOnce(Message dead) {
+        List<Map<String, Object>> deaths = (List<Map<String, Object>>) dead.getMessageProperties().getHeaders().get("x-death");
+        assertThat(deaths).singleElement().satisfies(death -> {
+            assertThat(death.get("queue")).isEqualTo(MessagingTopology.Q_ANALYSIS_FILING_SUBMITTED);
+            assertThat(death.get("reason")).isEqualTo("rejected");
+            assertThat(((Number) death.get("count")).intValue()).isEqualTo(1);
+        });
+    }
+}

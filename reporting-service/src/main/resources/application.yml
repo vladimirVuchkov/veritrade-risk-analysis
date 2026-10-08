@@ -14,6 +14,9 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      enabled: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -25,10 +28,20 @@ spring:
         prefetch: 10
         retry:
           enabled: true
-          max-attempts: 3
+          # Spring Boot 4.1 counts retries, not attempts: 2 retries = the 3 attempts of the contract.
+          max-retries: 2
           initial-interval: 1s
           multiplier: 2
           max-interval: 5s
+
+reporting:
+  # Contract maxLength values (code points), equal to the column sizes in V1__init.sql.
+  limits:
+    rule-id-max-length: 32
+    rules-version-max-length: 32
+    matched-text-max-length: 500
+    excerpt-max-length: 1000
+    failure-reason-max-length: 1000
 
 management:
   endpoints:

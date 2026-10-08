@@ -18,11 +18,15 @@ spring:
         acknowledge-mode: auto
         prefetch: 10
         retry:
+          # Spring Boot 4 counts retries after the first attempt: 2 retries = the 3 attempts of the contract.
           enabled: true
-          max-attempts: 3
+          max-retries: 2
           initial-interval: 1s
           multiplier: 2
           max-interval: 5s
+
+# Rule engine and publisher settings (veritrade.analysis.rules.*, veritrade.analysis.messaging.*)
+# have their defaults in RulesProperties and MessagingProperties; override them here or by environment.
 
 management:
   endpoints:

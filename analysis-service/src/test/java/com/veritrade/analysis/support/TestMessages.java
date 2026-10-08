@@ -1,0 +1,53 @@
+package com.veritrade.analysis.support;
+
+import com.veritrade.analysis.engine.ExcerptExtractor;
+import com.veritrade.analysis.engine.RiskAnalyzer;
+import com.veritrade.analysis.engine.RiskScorer;
+import com.veritrade.analysis.engine.RuleLoader;
+import com.veritrade.analysis.engine.RuleMatcher;
+import com.veritrade.analysis.engine.RuleSet;
+import com.veritrade.contracts.event.EventType;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import tools.jackson.databind.node.ObjectNode;
+
+/** Builds AMQP messages and a real analyzer for messaging tests. */
+public final class TestMessages {
+
+    private static final int CAP = 50;
+    private static final int MAX_MATCH = 500;
+    private static final int CONTEXT = 120;
+    private static final int THRESHOLD = 10;
+
+    private TestMessages() {
+    }
+
+    /** The contract example of filing.submitted with a fresh filing id. */
+    public static ObjectNode filingSubmitted(UUID filingId) {
+        ObjectNode event = ContractFixtures.example(EventType.FILING_SUBMITTED);
+        ((ObjectNode) event.get("payload")).put("filingId", filingId.toString());
+        return event;
+    }
+
+    public static Message message(ObjectNode event) {
+        return message(event.toString(), false);
+    }
+
+    public static Message message(String body, boolean redelivered) {
+        MessageProperties properties = new MessageProperties();
+        properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        properties.setRedelivered(redelivered);
+        return new Message(body.getBytes(StandardCharsets.UTF_8), properties);
+    }
+
+    public static RiskAnalyzer bundledAnalyzer() {
+        String rules = ContractFixtures.text("risk-rules.yml");
+        RuleSet ruleSet = new RuleLoader().load(
+                new ByteArrayInputStream(rules.getBytes(StandardCharsets.UTF_8)), "risk-rules.yml");
+        return new RiskAnalyzer(ruleSet, new RuleMatcher(CAP, MAX_MATCH), new ExcerptExtractor(CONTEXT),
+                new RiskScorer(THRESHOLD));
+    }
+}

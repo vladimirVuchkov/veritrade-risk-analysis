@@ -1,0 +1,7 @@
+# Replaces the root .dockerignore for frontend.Dockerfile: only the UI files and the nginx config
+# are sent to the builder. mock/, test/, package.json and README.md never reach the image.
+*
+!infra/nginx/default.conf
+!frontend/index.html
+!frontend/styles.css
+!frontend/js/

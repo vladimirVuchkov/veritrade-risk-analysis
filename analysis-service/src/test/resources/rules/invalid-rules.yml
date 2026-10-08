@@ -1,0 +1,12 @@
+rulesVersion: "test"
+rules:
+  - id: LEGAL-001
+    category: LEGAL
+    severity: HIGH
+    patterns:
+      - 'pending (litigation'
+  - id: LEGAL-001
+    category: LEGAL
+    severity: LOW
+    patterns:
+      - 'lawsuit'
