@@ -20,7 +20,7 @@ public final class TestSystem implements AutoCloseable {
     private TestSystem(Path repositoryRoot, ComposeStack stack) {
         this.repositoryRoot = repositoryRoot;
         this.stack = stack;
-        this.api = new Api(stack.endpoint(ComposeStack.FRONTEND, ComposeStack.UI_PORT));
+        this.api = new Api(() -> stack.endpoint(ComposeStack.FRONTEND, ComposeStack.UI_PORT));
         this.broker = new Broker(() -> stack.endpoint(ComposeStack.RABBITMQ, ComposeStack.MANAGEMENT_PORT));
     }
 

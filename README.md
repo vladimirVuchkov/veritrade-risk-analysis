@@ -284,7 +284,9 @@ Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is neede
   each host address from `docker compose port`. A `.env` with a non-loopback `BIND_ADDRESS` therefore
   makes `PublishedPortsE2E` fail by design.
 - It uses the `docker compose` CLI, not Testcontainers, because the scenarios stop and start single
-  services, read their logs and look up a port again after a broker restart.
+  services, read their logs and look up a port again after a restart. A restarted container can get
+  a new random host port, so the clients of nginx and of the management API look the port up again
+  after a refused connection.
 - The tests talk to the stack only through nginx and the RabbitMQ management API. REST bodies are
   validated against the OpenAPI, and every event they publish as valid is validated against its JSON
   Schema. Waits use Awaitility, with every timeout a named constant in `Timeouts`.
@@ -292,7 +294,7 @@ Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is neede
   -De2e.keepStack=true` reuses a named stack and leaves it running, for debugging.
 - The management credentials come from `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD` in the
   environment (default `veritrade`); export them when `.env` has other values.
-- A full run takes about 4 minutes (146 tests in 15 classes, warm image cache; `ServiceOutageE2E`
+- A full run takes about 4 minutes (147 tests in 16 classes, warm image cache; `ServiceOutageE2E`
   alone takes about 2 minutes). The test classes share one stack and run one after the other; classes
   that stop a service bring it back afterwards.
 
@@ -319,6 +321,7 @@ Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is neede
 | 19 | Both published ports bound to `127.0.0.1`; the broker logged the default-password warning | `PublishedPortsE2E` |
 | 20 | The demo filing hard-wrapped at 72 columns gives the same rule ids and summary as the unwrapped one | `HardWrappedFilingE2E` |
 | 21 | A filing of exactly 2 MB (ASCII, and Cyrillic with emoji) reaches `COMPLETED`; risk phrases at the start, the middle and the last bytes are all found | `LargeFilingE2E` |
+| 22 | nginx restarted (it can get a new host port): the API is reachable again and a filing completes | `FrontendRestartE2E` |
 
 **The frontend against the real stack.** `FrontendFlowE2E` runs
 [`frontend-flow.test.mjs`](e2e-tests/src/test/node/frontend-flow.test.mjs) with `node --test`. It

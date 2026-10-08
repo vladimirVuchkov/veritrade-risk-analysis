@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import tools.jackson.databind.JsonNode;
 
 /** The REST API, reached only through nginx. */
@@ -28,15 +30,19 @@ public final class Api {
     private static final int OK = 200;
     private static final int ACCEPTED = 202;
 
-    private final URI baseUri;
+    private final Supplier<URI> endpointLookup;
+    private volatile URI baseUri;
     private final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1).connectTimeout(Timeouts.HTTP_REQUEST).build();
 
-    public Api(URI baseUri) {
-        this.baseUri = baseUri;
+    public Api(Supplier<URI> endpointLookup) {
+        this.endpointLookup = endpointLookup;
+        this.baseUri = endpointLookup.get();
     }
 
+    /** The current address of nginx, looked up again: a restarted container gets a new host port. */
     public URI baseUri() {
+        baseUri = endpointLookup.get();
         return baseUri;
     }
 
@@ -121,12 +127,33 @@ public final class Api {
         return HttpRequest.newBuilder(baseUri.resolve(path)).timeout(Timeouts.HTTP_REQUEST);
     }
 
+    /**
+     * A refused connection usually means nginx was restarted on a new host port: look it up and send the
+     * request again. Nothing reached the server, so this is safe for a POST too.
+     */
     private ApiResponse send(HttpRequest request) {
+        try {
+            return sendOnce(request);
+        } catch (ConnectException firstFailure) {
+            URI uri = request.uri();
+            String pathAndQuery = uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
+            HttpRequest retry = HttpRequest.newBuilder(request, (name, value) -> true)
+                    .uri(baseUri().resolve(pathAndQuery)).build();
+            try {
+                return sendOnce(retry);
+            } catch (IOException e) {
+                e.addSuppressed(firstFailure);
+                throw new UncheckedIOException(e);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private ApiResponse sendOnce(HttpRequest request) throws IOException {
         try {
             var response = client.send(request, BodyHandlers.ofString());
             return new ApiResponse(response.statusCode(), response.headers(), response.body());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);

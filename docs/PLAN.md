@@ -424,7 +424,7 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 | 3.3 Clean clone: `docker compose up --build` + `smoke.sh` on a fresh checkout | confirmed | done: fresh clone, build also without the layer cache, smoke and chaos 6/6 |
 | 3.4 README review against the checklist (section 11) | | done: section 11 ticked where it can be checked before publishing; final review added `docs/MANUAL-TESTING.md` and two tests for coverage gaps |
 | 3.5 Conversation records ordered; denylist check and secret check (12.2) | records contain only this task | done: records 01-04; 03 re-exported with the end of its session; 04 is the final review session |
-| 3.6 Publish to GitHub and open the link in a logged-out browser | URL for the reply email | open; needs the author's approval to push |
+| 3.6 Publish to GitHub and open the link in a logged-out browser | URL for the reply email | done: pushed with the author's approval; public, clones without credentials; https://github.com/vladimirVuchkov/veritrade-risk-analysis |
 
 ---
 
@@ -470,7 +470,7 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 
 ## 11. Acceptance checklist before sending
 
-- [ ] The repository is public and clones without errors
+- [x] The repository is public and clones without errors
 - [x] `docker compose up --build` works from scratch with no manual steps
 - [x] `scripts/smoke.sh` passes
 - [x] `scripts/chaos.sh` passes
@@ -574,9 +574,9 @@ The README "AI tools" section is a short extract of the log (tool -> what it was
 | 2 - Integration (F, G) | done, local | `0201723` | plus E2E 132/132, export tool tests |
 | 3.1-3.2 - Review and fixes (A, B, D, E, G) | done, local | Wave 3 commit | `mvnw verify` 840, frontend 218, export tool 7, E2E 144, smoke, chaos 6/6 |
 | 3.3 - Clean clone | done | | fresh clone: `compose up --build` (also `--no-cache`), smoke, chaos 6/6 |
-| 3.4 - README against section 11 and final review | done, local | final review commit | `mvnw verify` 842, frontend 218, export tool 7, E2E 146; `docs/MANUAL-TESTING.md` checked against a running stack |
+| 3.4 - README against section 11 and final review | done, local | final review commit | `mvnw verify` 842, frontend 218, export tool 7, E2E 147 (after the CI fix); `docs/MANUAL-TESTING.md` checked against a running stack |
 | 3.5 - Conversation records | done, local: 01-04 | records commit | denylist and secret check |
-| 3.6 - Publishing | open; push only after the author's approval | | |
+| 3.6 - Publishing | done: pushed with approval, repository public | CI fix commit | first CI run: E2E failed on a stale nginx port in the test client; fixed, `FrontendRestartE2E` added |
 
 Open items carried forward: a replay tool for parked outbox rows (known limitation, see README); the
 "My intervention" and "Decision" fields of the process log are filled in by the author.

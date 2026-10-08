@@ -119,10 +119,11 @@ _Entries are collected from the handoff notes in `handoff/`._
   - Records: the session of Waves 1-3 had continued after its export (the final commits), so `03` was exported again from the same transcript; this session is `04`.
 - **My intervention:** _to be completed_
 - **Decision:** _to be completed_
-- **Verification:** a fresh clone of `main`: `docker compose up --build` (also with `--no-cache`), `scripts/smoke.sh` passed, `scripts/chaos.sh` six of six; on the merged branch `./mvnw -B verify` green (842 tests: contracts 29, Ingestion 327 + 26 IT, Analysis 286 + 20 IT, Reporting 137 + 17 IT), `node --test frontend/test/` 218/218, export tool 7/7, `./mvnw -B -Pe2e verify -pl e2e-tests -am` 146/146; each new test was shown to fail on broken behaviour.
+- **Verification:** a fresh clone of `main`: `docker compose up --build` (also with `--no-cache`), `scripts/smoke.sh` passed, `scripts/chaos.sh` six of six; on the merged branch `./mvnw -B verify` green (842 tests: contracts 29, Ingestion 327 + 26 IT, Analysis 286 + 20 IT, Reporting 137 + 17 IT), `node --test frontend/test/` 218/218, export tool 7/7, `./mvnw -B -Pe2e verify -pl e2e-tests -am` 146/146, and 147/147 after the CI fix below; each new test was shown to fail on broken behaviour. After the push (with the author's approval) the repository is public and clones without credentials.
 - **Problems/lessons:**
   - The agents' worktrees started from `origin/main` (the Wave 0 skeleton), not from local `main`; both agents noticed and moved to local `main` before working. Unpushed work makes this easy to miss.
   - A record exported before the end of its session misses the last steps; the final export of a session is made after its last commit.
+  - The first CI run of the end-to-end suite failed although it passed locally every time: on the GitHub runner Compose restarted nginx while bringing a dependency back, nginx got a new random host port, and the test client kept the old one, so every later request was refused. The client now looks the port up again after a refused connection, and `FrontendRestartE2E` reproduces the case (it fails with the same error without the fix). Everything had been local until this review, so CI had never run the suite before.
 
 ## 3. Part of the system -> AI contribution -> my contribution
 

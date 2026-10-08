@@ -148,6 +148,12 @@ the runs listed under "How to verify" (all passed).
   - After the Wave 3 follow-up (`LargeFilingE2E`): 146 tests in 15 classes, all passed, 4:07
     (`LargeFilingE2E` 4.5 s). With an absent rule id (`MKT-004` in place of `REG-004`) expected,
     both `LargeFilingE2E` tests failed; the change was reverted.
+  - First CI run of the suite (after the push): `ServiceOutageE2E` and every later class failed with
+    `ConnectException`. Compose had restarted nginx while bringing a dependency back, nginx got a new
+    random host port, and `Api` still used the port it looked up at the start. The orchestrator made
+    `Api` look the port up again after a refused connection (as `Broker` already did) and added
+    `FrontendRestartE2E`, which fails with the same `ConnectException` without the fix. Local run:
+    147 tests in 16 classes, all passed, 4:08.
 - `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B verify`: green, 663 tests
   (654 before plus the new regression tests). One earlier attempt failed with "Could not connect to
   Ryuk" in Reporting's ITs (a colima port-forward hiccup); the rerun passed.
