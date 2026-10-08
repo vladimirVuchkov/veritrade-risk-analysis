@@ -124,6 +124,7 @@ _Entries are collected from the handoff notes in `handoff/`._
   - The agents' worktrees started from `origin/main` (the Wave 0 skeleton), not from local `main`; both agents noticed and moved to local `main` before working. Unpushed work makes this easy to miss.
   - A record exported before the end of its session misses the last steps; the final export of a session is made after its last commit.
   - The first CI run of the end-to-end suite failed although it passed locally every time: on the GitHub runner Compose restarted nginx while bringing a dependency back, nginx got a new random host port, and the test client kept the old one, so every later request was refused. The client now looks the port up again after a refused connection, and `FrontendRestartE2E` reproduces the case (it fails with the same error without the fix). Everything had been local until this review, so CI had never run the suite before.
+  - The next CI run (a docs-only commit) failed once in the frontend tests: on the slow runner the first status poll against the mock server came more than 60 ms after the submit, so the test never saw `SUBMITTED`. It did not fail locally even under load. The mock phases in the test are now 5 times longer (300/400/600 ms), well inside the polling limits.
 
 ## 3. Part of the system -> AI contribution -> my contribution
 

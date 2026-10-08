@@ -11,7 +11,8 @@ import { MOCK_DEFAULTS } from '../mock/mock-config.js';
 import { createMockServer } from '../mock/server.js';
 import { byTag, createFakeDocument, serialize } from './support/fake-dom.js';
 
-const TIMINGS = { submittedMs: 60, analyzingMs: 80, reportDelayMs: 120 };
+// Wide enough that a slow CI runner still sees every phase: the first status poll must land inside SUBMITTED.
+const TIMINGS = { submittedMs: 300, analyzingMs: 400, reportDelayMs: 600 };
 const SETTINGS = { ...CONFIG.polling, intervalMs: 20, statusMaxAttempts: 100, reportMaxAttempts: 100, maxConsecutiveTransientErrors: 3 };
 const doc = createFakeDocument();
 
