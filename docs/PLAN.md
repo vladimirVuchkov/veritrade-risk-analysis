@@ -478,7 +478,7 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 - [ ] The UI shows a report and a failure (`FAILED`) — checked through the API and the frontend tests; look at it in a browser with `docs/MANUAL-TESTING.md` step 4
 - [x] README covers section 10
 - [x] `docs/ai-conversations/` contains the records, only about this task, with no secrets, personal data, or keys (denylist check passes)
-- [ ] The CI workflow is green (build and compose smoke job)
+- [x] The CI workflow is green (build and compose smoke job; also the end-to-end suite, run 37840894161)
 - [ ] `docs/ai-process-log.md` is filled in per the template (12.3–12.4) for all waves and agents — everything except the author's fields ("My intervention", "Decision", "My contribution", the conclusion)
 - [x] README has an "AI tools" section linking to the log and the records
 - [ ] No unused code, magic numbers, or copied blocks
