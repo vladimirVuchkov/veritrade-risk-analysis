@@ -22,9 +22,9 @@ class BrokerConnectionTimeoutTest {
 
     @Test
     void connectionAttemptsCannotOutlastTheDockerStopGracePeriod() {
-        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
+        final YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
-        String timeout = yaml.getObject().getProperty("spring.rabbitmq.connection-timeout");
+        final String timeout = yaml.getObject().getProperty("spring.rabbitmq.connection-timeout");
 
         assertThat(timeout).isNotNull();
         assertThat(DurationStyle.detectAndParse(timeout).multipliedBy(CONNECTION_ATTEMPTS_DURING_SHUTDOWN))

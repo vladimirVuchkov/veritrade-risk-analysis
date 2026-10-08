@@ -17,9 +17,9 @@ public final class OpenApiContract {
     private OpenApiContract() {
     }
 
-    public static List<Error> validate(String componentSchema, String json) {
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(OPENAPI + componentSchema));
-        JsonNode node = TestEvents.MAPPER.readTree(json);
+    public static List<Error> validate(final String componentSchema, final String json) {
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(OPENAPI + componentSchema));
+        final JsonNode node = TestEvents.MAPPER.readTree(json);
         return schema.validate(node);
     }
 }

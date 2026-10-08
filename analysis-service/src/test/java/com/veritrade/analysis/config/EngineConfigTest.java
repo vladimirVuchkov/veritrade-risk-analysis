@@ -62,7 +62,7 @@ class EngineConfigTest {
         "max-excerpt-chars=1001 => maxExcerptChars must be between maxMatchedTextChars (500) and 1000",
         "max-excerpt-chars=499 => maxExcerptChars must be between maxMatchedTextChars (500) and 1000"
     })
-    void refusesToStartWithALimitAboveTheSchema(String property, String message) {
+    void refusesToStartWithALimitAboveTheSchema(final String property, final String message) {
         context.withPropertyValues("veritrade.analysis.rules." + property)
                 .run(app -> assertThat(app).getFailure()
                         .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -71,13 +71,13 @@ class EngineConfigTest {
 
     @Test
     void keepsEveryFindingWithinTheSchemaLimitsWhateverTheContext() {
-        String emojis = "\uD83D\uDE00".repeat(RulesProperties.SCHEMA_MAX_EXCERPT);
-        String text = emojis + "risk ".repeat(RulesProperties.SCHEMA_MAX_MATCHED_TEXT) + emojis;
+        final String emojis = "\uD83D\uDE00".repeat(RulesProperties.SCHEMA_MAX_EXCERPT);
+        final String text = emojis + "risk ".repeat(RulesProperties.SCHEMA_MAX_MATCHED_TEXT) + emojis;
         context.withPropertyValues(
                         "veritrade.analysis.rules.location=classpath:rules/long-match-rule.yml",
                         "veritrade.analysis.rules.excerpt-context-chars=" + RulesProperties.SCHEMA_MAX_EXCERPT)
                 .run(app -> {
-                    Finding finding = app.getBean(RiskAnalyzer.class).analyze(text).findings().getFirst();
+                    final Finding finding = app.getBean(RiskAnalyzer.class).analyze(text).findings().getFirst();
 
                     assertThat(finding.matchedText()).hasSize(RulesProperties.SCHEMA_MAX_MATCHED_TEXT);
                     assertThat(finding.excerpt()).hasSizeLessThanOrEqualTo(RulesProperties.SCHEMA_MAX_EXCERPT)
@@ -93,7 +93,7 @@ class EngineConfigTest {
                         "veritrade.analysis.rules.excerpt-context-chars=1",
                         "veritrade.analysis.rules.escalation-threshold=2")
                 .run(app -> {
-                    AnalysisResult result = app.getBean(RiskAnalyzer.class).analyze("a risk, a risk, a risk");
+                    final AnalysisResult result = app.getBean(RiskAnalyzer.class).analyze("a risk, a risk, a risk");
 
                     assertThat(result.rulesVersion()).isEqualTo("test-2");
                     assertThat(result.totalFindings()).isEqualTo(2);

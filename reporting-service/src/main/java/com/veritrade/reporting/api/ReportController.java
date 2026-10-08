@@ -14,7 +14,7 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    public ReportController(ReportService reportService) {
+    public ReportController(final ReportService reportService) {
         this.reportService = reportService;
     }
 
@@ -23,17 +23,17 @@ public class ReportController {
      * no 400 here, so an id that is not a UUID is answered like any other unknown filing.
      */
     @GetMapping("/{filingId}")
-    public ReportResponse getReport(@PathVariable String filingId) {
-        UUID id = parse(filingId);
+    public ReportResponse getReport(@PathVariable final String filingId) {
+        final UUID id = parse(filingId);
         return reportService.findReport(id)
                 .map(ReportResponse::from)
                 .orElseThrow(() -> ReportNotFoundException.notReady(id));
     }
 
-    private static UUID parse(String filingId) {
+    private static UUID parse(final String filingId) {
         try {
             return UUID.fromString(filingId);
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
             throw ReportNotFoundException.malformedId();
         }
     }

@@ -25,45 +25,45 @@ public class AnalysisEventFactory {
     private final Clock clock;
     private final int maxReasonLength;
 
-    public AnalysisEventFactory(Clock clock, MessagingProperties properties) {
+    public AnalysisEventFactory(final Clock clock, final MessagingProperties properties) {
         this.clock = clock;
         this.maxReasonLength = properties.maxReasonLength();
     }
 
-    public EventEnvelope<AnalysisStartedPayload> started(UUID filingId, String correlationId) {
-        Instant now = clock.instant();
+    public EventEnvelope<AnalysisStartedPayload> started(final UUID filingId, final String correlationId) {
+        final Instant now = clock.instant();
         return envelope(EventType.ANALYSIS_STARTED, filingId, correlationId, now,
                 new AnalysisStartedPayload(filingId, now));
     }
 
-    public EventEnvelope<AnalysisCompletedPayload> completed(UUID filingId, String correlationId, AnalysisResult result) {
-        Instant now = clock.instant();
-        AnalysisSummary summary = new AnalysisSummary(
+    public EventEnvelope<AnalysisCompletedPayload> completed(final UUID filingId, final String correlationId, final AnalysisResult result) {
+        final Instant now = clock.instant();
+        final AnalysisSummary summary = new AnalysisSummary(
                 result.totalFindings(), result.overallRiskLevel(), result.byCategory());
-        AnalysisCompletedPayload payload = new AnalysisCompletedPayload(
+        final AnalysisCompletedPayload payload = new AnalysisCompletedPayload(
                 filingId, now, result.rulesVersion(), summary,
                 result.findings().stream().map(AnalysisEventFactory::toPayload).toList());
         return envelope(EventType.ANALYSIS_COMPLETED, filingId, correlationId, now, payload);
     }
 
-    public EventEnvelope<AnalysisFailedPayload> failed(UUID filingId, String correlationId, String reason) {
-        Instant now = clock.instant();
+    public EventEnvelope<AnalysisFailedPayload> failed(final UUID filingId, final String correlationId, final String reason) {
+        final Instant now = clock.instant();
         return envelope(EventType.ANALYSIS_FAILED, filingId, correlationId, now,
                 new AnalysisFailedPayload(filingId, now, limit(reason)));
     }
 
     private static <T> EventEnvelope<T> envelope(
-            EventType type, UUID filingId, String correlationId, Instant now, T payload) {
+            final EventType type, final UUID filingId, final String correlationId, final Instant now, final T payload) {
         return EventEnvelope.of(EventIds.forFiling(filingId, type), type, now, correlationId, payload);
     }
 
-    private static FindingPayload toPayload(Finding finding) {
+    private static FindingPayload toPayload(final Finding finding) {
         return new FindingPayload(finding.category(), finding.severity(), finding.ruleId(),
                 finding.matchedText(), finding.excerpt(), finding.position());
     }
 
     /** Cuts the reason to the limit in UTF-16 code units; a surrogate pair at the cut is dropped whole. */
-    private String limit(String reason) {
+    private String limit(final String reason) {
         if (reason.length() <= maxReasonLength) {
             return reason;
         }

@@ -18,7 +18,7 @@ final class RetryBackoff {
     private Duration current = Duration.ZERO;
     private Instant resumeAt = Instant.MIN;
 
-    RetryBackoff(Clock clock, IngestionProperties.Outbox settings) {
+    RetryBackoff(final Clock clock, final IngestionProperties.Outbox settings) {
         this.clock = clock;
         this.initial = settings.retryBackoff();
         this.multiplier = settings.retryBackoffMultiplier();
@@ -41,8 +41,8 @@ final class RetryBackoff {
         resumeAt = Instant.MIN;
     }
 
-    private Duration longer(Duration pause) {
-        Duration next = Duration.ofMillis(Math.round(pause.toMillis() * multiplier));
+    private Duration longer(final Duration pause) {
+        final Duration next = Duration.ofMillis(Math.round(pause.toMillis() * multiplier));
         return next.compareTo(max) > 0 ? max : next;
     }
 }

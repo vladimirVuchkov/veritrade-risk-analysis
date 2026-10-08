@@ -7,7 +7,7 @@ public class RuleValidationException extends RuntimeException {
 
     private final List<String> errors;
 
-    public RuleValidationException(String source, List<String> errors) {
+    public RuleValidationException(final String source, final List<String> errors) {
         super("Invalid risk rules in " + source + ":" + System.lineSeparator() + " - "
                 + String.join(System.lineSeparator() + " - ", errors));
         this.errors = List.copyOf(errors);

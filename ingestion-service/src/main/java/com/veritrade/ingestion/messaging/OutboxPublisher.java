@@ -53,8 +53,8 @@ public class OutboxPublisher {
     private final int batchSize;
     private final RetryBackoff backoff;
 
-    public OutboxPublisher(OutboxService outbox, RabbitTemplate rabbitTemplate, IngestionProperties properties,
-            Clock clock) {
+    public OutboxPublisher(final OutboxService outbox, final RabbitTemplate rabbitTemplate, final IngestionProperties properties,
+            final Clock clock) {
         this.outbox = outbox;
         this.rabbitTemplate = rabbitTemplate;
         this.confirmTimeout = properties.outbox().confirmTimeout();
@@ -85,7 +85,7 @@ public class OutboxPublisher {
     }
 
     private boolean publishInOrder(List<OutboxEvent> batch) {
-        for (OutboxEvent event : batch) {
+        for (final OutboxEvent event : batch) {
             if (publish(event) == Outcome.RETRY_LATER) {
                 return false;
             }
@@ -93,10 +93,10 @@ public class OutboxPublisher {
         return true;
     }
 
-    private Outcome publish(OutboxEvent event) {
+    private Outcome publish(final OutboxEvent event) {
         MDC.put(CorrelationIds.MDC_KEY, event.correlationId());
         try {
-            CorrelationData correlation = new CorrelationData(event.id().toString());
+            final CorrelationData correlation = new CorrelationData(event.id().toString());
             rabbitTemplate.send(MessagingTopology.EVENTS_EXCHANGE, event.routingKey(), toMessage(event), correlation);
             if (!isConfirmed(correlation)) {
                 return Outcome.RETRY_LATER;
@@ -104,19 +104,19 @@ public class OutboxPublisher {
             outbox.markPublished(event.id());
             log.info("Published event {} with routing key {}", event.id(), event.routingKey());
             return Outcome.PUBLISHED;
-        } catch (AmqpException | IllegalArgumentException e) {
+        } catch (final AmqpException | IllegalArgumentException e) {
             return PublishFailures.isCausedByTheMessage(e) ? countFailure(event, e) : brokerFailure(event, e);
         } finally {
             MDC.remove(CorrelationIds.MDC_KEY);
         }
     }
 
-    private static Outcome brokerFailure(OutboxEvent event, RuntimeException e) {
+    private static Outcome brokerFailure(final OutboxEvent event, final RuntimeException e) {
         log.warn("Event {} not published, will retry: {}", event.id(), e.getMessage());
         return Outcome.RETRY_LATER;
     }
 
-    private Outcome countFailure(OutboxEvent event, RuntimeException e) {
+    private Outcome countFailure(final OutboxEvent event, final RuntimeException e) {
         if (outbox.recordFailedAttempt(event.id(), e.toString())) {
             log.error("Event {} parked after {} failed attempts and will not be published; later events go on: {}",
                     event.id(), outbox.maxAttempts(), e.toString());
@@ -127,9 +127,9 @@ public class OutboxPublisher {
         return Outcome.RETRY_LATER;
     }
 
-    private boolean isConfirmed(CorrelationData correlation) {
+    private boolean isConfirmed(final CorrelationData correlation) {
         try {
-            CorrelationData.Confirm confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
+            final CorrelationData.Confirm confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
             if (!confirm.ack()) {
                 log.warn("Event {} negatively confirmed, will retry: {}", correlation.getId(), confirm.reason());
                 return false;
@@ -140,16 +140,16 @@ public class OutboxPublisher {
                 return false;
             }
             return true;
-        } catch (TimeoutException | ExecutionException e) {
+        } catch (final TimeoutException | ExecutionException e) {
             log.warn("No confirm for event {}, will retry: {}", correlation.getId(), e.toString());
             return false;
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
         }
     }
 
-    private static Message toMessage(OutboxEvent event) {
+    private static Message toMessage(final OutboxEvent event) {
         return MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setContentEncoding(StandardCharsets.UTF_8.name())

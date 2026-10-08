@@ -39,11 +39,11 @@ class OutboxServiceTest {
 
     @Test
     void storesTheEnvelopeAsJsonUnderItsEventId() {
-        EventEnvelope<FilingSubmittedPayload> envelope = submittedEnvelope();
+        final EventEnvelope<FilingSubmittedPayload> envelope = submittedEnvelope();
 
         service.enqueue(envelope);
 
-        OutboxEvent row = savedRow();
+        final OutboxEvent row = savedRow();
         assertThat(row.id()).isEqualTo(envelope.eventId());
         assertThat(row.routingKey()).isEqualTo("filing.submitted");
         assertThat(row.correlationId()).isEqualTo("corr-7");
@@ -55,16 +55,16 @@ class OutboxServiceTest {
     void storedPayloadIsValidAgainstTheContractSchema() {
         service.enqueue(submittedEnvelope());
 
-        String payload = savedRow().payload();
+        final String payload = savedRow().payload();
         assertThat(Contracts.validate(EventType.FILING_SUBMITTED, payload)).isEmpty();
-        JsonNode json = jsonMapper.readTree(payload);
+        final JsonNode json = jsonMapper.readTree(payload);
         assertThat(json.get("occurredAt").asString()).isEqualTo("2026-10-07T12:00:00.123456Z");
         assertThat(json.get("payload").get("content").asString()).isEqualTo("Risk factors: pending litigation.");
     }
 
     @Test
     void readsTheNextBatchWithTheConfiguredSize() {
-        List<OutboxEvent> rows = List.of(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "c", "{}", NOW));
+        final List<OutboxEvent> rows = List.of(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "c", "{}", NOW));
         when(repository.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(BATCH_SIZE))).thenReturn(rows);
 
         assertThat(service.nextBatch()).isEqualTo(rows);
@@ -72,7 +72,7 @@ class OutboxServiceTest {
 
     @Test
     void marksPublishedWithTheCurrentTimeInMicroseconds() {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
 
         service.markPublished(id);
 
@@ -81,7 +81,7 @@ class OutboxServiceTest {
 
     @Test
     void countsAFailedAttemptAndParksOnlyWhenTheMaximumIsReached() {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
         when(repository.parkIfExhausted(id, TestProperties.MAX_ATTEMPTS, MICROS)).thenReturn(0, 1);
 
         assertThat(service.recordFailedAttempt(id, "IllegalArgumentException: Short string too long")).isFalse();
@@ -93,7 +93,7 @@ class OutboxServiceTest {
 
     @Test
     void cutsTheErrorToTheColumnLength() {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
 
         service.recordFailedAttempt(id, "e".repeat(OutboxEvent.LAST_ERROR_LENGTH + 1));
 
@@ -101,14 +101,14 @@ class OutboxServiceTest {
     }
 
     private OutboxEvent savedRow() {
-        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        final ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(repository).save(captor.capture());
         return captor.getValue();
     }
 
     private static EventEnvelope<FilingSubmittedPayload> submittedEnvelope() {
-        UUID filingId = UUID.randomUUID();
-        Instant at = Instant.parse("2026-10-07T12:00:00.123456Z");
+        final UUID filingId = UUID.randomUUID();
+        final Instant at = Instant.parse("2026-10-07T12:00:00.123456Z");
         return EventEnvelope.of(EventIds.forFiling(filingId, EventType.FILING_SUBMITTED), EventType.FILING_SUBMITTED,
                 at, "corr-7", new FilingSubmittedPayload(filingId, "Acme", "10-K", "Risk factors: pending litigation.", at));
     }

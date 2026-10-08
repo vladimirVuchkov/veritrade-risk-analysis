@@ -61,10 +61,10 @@ class FilingStatusServiceTest {
 
     @ParameterizedTest(name = "{0} + event for {1} -> {2}")
     @MethodSource("eventsAgainstEveryStatus")
-    void writesOnlyAllowedTransitionsAndNeverThrows(FilingStatus current, FilingStatus target, StatusChange expected) {
-        UUID filingId = filingIn(current);
+    void writesOnlyAllowedTransitionsAndNeverThrows(final FilingStatus current, final FilingStatus target, final StatusChange expected) {
+        final UUID filingId = filingIn(current);
 
-        StatusChange change = service.apply(update(filingId, target, "reason"));
+        final StatusChange change = service.apply(update(filingId, target, "reason"));
 
         assertThat(change).isEqualTo(expected);
         if (expected == StatusChange.APPLIED) {
@@ -77,7 +77,7 @@ class FilingStatusServiceTest {
     /** Review W3-07: a status event must not load the filing entity, whose content can be 2 MB. */
     @Test
     void neverLoadsTheFilingEntity() {
-        UUID filingId = filingIn(SUBMITTED);
+        final UUID filingId = filingIn(SUBMITTED);
 
         service.apply(update(filingId, ANALYZING, null));
 
@@ -88,9 +88,9 @@ class FilingStatusServiceTest {
     }
 
     @Test
-    void lateStartedAfterCompletedIsIgnoredWithAWarning(CapturedOutput output) {
-        UUID filingId = filingIn(COMPLETED);
-        StatusUpdate late = update(filingId, ANALYZING, null);
+    void lateStartedAfterCompletedIsIgnoredWithAWarning(final CapturedOutput output) {
+        final UUID filingId = filingIn(COMPLETED);
+        final StatusUpdate late = update(filingId, ANALYZING, null);
 
         assertThat(service.apply(late)).isEqualTo(StatusChange.REJECTED);
 
@@ -99,9 +99,9 @@ class FilingStatusServiceTest {
     }
 
     @Test
-    void failedAfterCompletedIsIgnoredWithAWarning(CapturedOutput output) {
-        UUID filingId = filingIn(COMPLETED);
-        StatusUpdate contradictory = update(filingId, FAILED, "rule engine error");
+    void failedAfterCompletedIsIgnoredWithAWarning(final CapturedOutput output) {
+        final UUID filingId = filingIn(COMPLETED);
+        final StatusUpdate contradictory = update(filingId, FAILED, "rule engine error");
 
         assertThat(service.apply(contradictory)).isEqualTo(StatusChange.REJECTED);
 
@@ -110,8 +110,8 @@ class FilingStatusServiceTest {
     }
 
     @Test
-    void duplicateEventIsNotAWarning(CapturedOutput output) {
-        UUID filingId = filingIn(COMPLETED);
+    void duplicateEventIsNotAWarning(final CapturedOutput output) {
+        final UUID filingId = filingIn(COMPLETED);
 
         service.apply(update(filingId, COMPLETED, null));
 
@@ -120,7 +120,7 @@ class FilingStatusServiceTest {
 
     @Test
     void storesTheFailureReasonAndTheTimeOfTheChange() {
-        UUID filingId = filingIn(ANALYZING);
+        final UUID filingId = filingIn(ANALYZING);
 
         service.apply(update(filingId, FAILED, "Analysis failed after 3 attempts"));
 
@@ -129,8 +129,8 @@ class FilingStatusServiceTest {
 
     @Test
     void keepsAFailureReasonOfExactlyTheLimitWhole() {
-        UUID filingId = filingIn(SUBMITTED);
-        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
+        final UUID filingId = filingIn(SUBMITTED);
+        final String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
 
         service.apply(update(filingId, FAILED, reason));
 
@@ -139,7 +139,7 @@ class FilingStatusServiceTest {
 
     @Test
     void storesNoReasonForAnyOtherStatus() {
-        UUID filingId = filingIn(ANALYZING);
+        final UUID filingId = filingIn(ANALYZING);
 
         service.apply(update(filingId, COMPLETED, "ignored"));
 
@@ -148,7 +148,7 @@ class FilingStatusServiceTest {
 
     @Test
     void failsWhenTheFilingChangedConcurrentlySoTheListenerRetries() {
-        UUID filingId = filingIn(SUBMITTED);
+        final UUID filingId = filingIn(SUBMITTED);
         when(filings.changeStatus(any(), any(), any(), any(), any())).thenReturn(0);
 
         assertThatThrownBy(() -> service.apply(update(filingId, ANALYZING, null)))
@@ -157,7 +157,7 @@ class FilingStatusServiceTest {
 
     @Test
     void failsForAnUnknownFiling() {
-        UUID unknown = UUID.randomUUID();
+        final UUID unknown = UUID.randomUUID();
         when(filings.findStateById(unknown)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.apply(update(unknown, ANALYZING, null)))
@@ -166,21 +166,21 @@ class FilingStatusServiceTest {
 
     @Test
     void statusUpdateRequiresIdsAndTarget() {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
 
         assertThatThrownBy(() -> new StatusUpdate(null, id, ANALYZING, null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new StatusUpdate(id, null, ANALYZING, null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new StatusUpdate(id, id, null, null)).isInstanceOf(NullPointerException.class);
     }
 
-    private UUID filingIn(FilingStatus status) {
-        UUID filingId = UUID.randomUUID();
+    private UUID filingIn(final FilingStatus status) {
+        final UUID filingId = UUID.randomUUID();
         when(filings.findStateById(filingId)).thenReturn(Optional.of(new FilingState(filingId, status, VERSION)));
         when(filings.changeStatus(eq(filingId), any(), any(), any(), any())).thenReturn(1);
         return filingId;
     }
 
-    private static StatusUpdate update(UUID filingId, FilingStatus target, String reason) {
+    private static StatusUpdate update(final UUID filingId, final FilingStatus target, final String reason) {
         return new StatusUpdate(UUID.randomUUID(), filingId, target, reason);
     }
 }

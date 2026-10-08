@@ -30,7 +30,7 @@ public record EventEnvelope<T>(
     }
 
     public static <T> EventEnvelope<T> of(
-            UUID eventId, EventType eventType, Instant occurredAt, String correlationId, T payload) {
+            final UUID eventId, final EventType eventType, final Instant occurredAt, final String correlationId, final T payload) {
         return new EventEnvelope<>(eventId, eventType, CURRENT_VERSION, occurredAt, correlationId, payload);
     }
 }

@@ -13,11 +13,11 @@ public final class Json {
     private Json() {
     }
 
-    public static JsonNode parse(String text) {
+    public static JsonNode parse(final String text) {
         return MAPPER.readTree(text);
     }
 
-    public static String write(Object value) {
+    public static String write(final Object value) {
         return MAPPER.writeValueAsString(value);
     }
 

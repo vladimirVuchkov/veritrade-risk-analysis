@@ -55,12 +55,12 @@ public class RabbitConfig {
     }
 
     @Bean
-    Binding filingSubmittedBinding(Queue filingSubmittedQueue, TopicExchange eventsExchange) {
+    Binding filingSubmittedBinding(final Queue filingSubmittedQueue, final TopicExchange eventsExchange) {
         return BindingBuilder.bind(filingSubmittedQueue).to(eventsExchange).with(RK_FILING_SUBMITTED);
     }
 
     @Bean
-    Binding filingSubmittedDeadLetterBinding(Queue filingSubmittedDeadLetterQueue, DirectExchange deadLetterExchange) {
+    Binding filingSubmittedDeadLetterBinding(final Queue filingSubmittedDeadLetterQueue, final DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(filingSubmittedDeadLetterQueue).to(deadLetterExchange)
                 .with(Q_ANALYSIS_FILING_SUBMITTED);
     }
@@ -74,7 +74,7 @@ public class RabbitConfig {
      * reads it.
      */
     @Bean
-    RabbitTemplateCustomizer jsonTemplateConverter(JsonMapper jsonMapper) {
+    RabbitTemplateCustomizer jsonTemplateConverter(final JsonMapper jsonMapper) {
         return template -> template.setMessageConverter(new JacksonJsonMessageConverter(jsonMapper));
     }
 

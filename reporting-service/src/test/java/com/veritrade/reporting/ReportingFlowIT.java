@@ -47,7 +47,7 @@ class ReportingFlowIT {
     private static final String DLQ = MessagingTopology.deadLetterQueue(MessagingTopology.Q_REPORTING_ANALYSIS_RESULTS);
 
     @DynamicPropertySource
-    static void rabbit(DynamicPropertyRegistry registry) {
+    static void rabbit(final DynamicPropertyRegistry registry) {
         RabbitTestContainer.register(registry, "flow-it");
     }
 
@@ -70,19 +70,19 @@ class ReportingFlowIT {
 
     @Test
     void publishedCompletedExampleBecomesTheReportOfTheExample() {
-        ObjectNode event = example(COMPLETED_EXAMPLE);
+        final ObjectNode event = example(COMPLETED_EXAMPLE);
         publish(MessagingTopology.RK_ANALYSIS_COMPLETED, event.toString(), event.get("eventId").asString());
 
-        MvcTestResult result = awaitReport(UUID.fromString(event.get("payload").get("filingId").asString()));
+        final MvcTestResult result = awaitReport(UUID.fromString(event.get("payload").get("filingId").asString()));
 
-        JsonNode report = TestEvents.MAPPER.readTree(body(result));
-        JsonNode payload = event.get("payload");
+        final JsonNode report = TestEvents.MAPPER.readTree(body(result));
+        final JsonNode payload = event.get("payload");
         assertThat(OpenApiContract.validate("ReportResponse", body(result))).isEmpty();
         assertThat(report.get("filingId")).isEqualTo(payload.get("filingId"));
         assertThat(report.get("status").asString()).isEqualTo("COMPLETED");
         assertThat(report.get("rulesVersion")).isEqualTo(payload.get("rulesVersion"));
         assertThat(report.get("findings")).isEqualTo(payload.get("findings"));
-        JsonNode summary = report.get("summary");
+        final JsonNode summary = report.get("summary");
         assertThat(summary.get("totalFindings")).isEqualTo(payload.get("summary").get("totalFindings"));
         assertThat(summary.get("overallRiskLevel")).isEqualTo(payload.get("summary").get("overallRiskLevel"));
         assertThat(summary.get("byCategory")).isEqualTo(payload.get("summary").get("byCategory"));
@@ -91,8 +91,8 @@ class ReportingFlowIT {
 
     @Test
     void doubleDeliveryGivesOneReport() {
-        UUID filingId = UUID.randomUUID();
-        EventEnvelope<?> event = completedEnvelope(completed(filingId, RiskLevel.HIGH, List.of(
+        final UUID filingId = UUID.randomUUID();
+        final EventEnvelope<?> event = completedEnvelope(completed(filingId, RiskLevel.HIGH, List.of(
                 finding(RiskCategory.LEGAL, Severity.HIGH, 1), finding(RiskCategory.MARKET, Severity.LOW, 2))));
 
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_COMPLETED, producerMessage(event));
@@ -107,11 +107,11 @@ class ReportingFlowIT {
 
     @Test
     void analysisFailedCreatesAFailedReport() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_FAILED,
                 producerMessage(failedEnvelope(failed(filingId, "Analysis failed after 3 attempts"))));
 
-        MvcTestResult result = awaitReport(filingId);
+        final MvcTestResult result = awaitReport(filingId);
 
         assertThat(OpenApiContract.validate("ReportResponse", body(result))).isEmpty();
         assertThat(result).bodyJson().isLenientlyEqualTo("""
@@ -121,7 +121,7 @@ class ReportingFlowIT {
 
     @Test
     void lateContradictoryEventIsAcknowledgedAndIgnored() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_COMPLETED,
                 producerMessage(completedEnvelope(completed(filingId, RiskLevel.NONE, List.of()))));
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_FAILED,
@@ -138,26 +138,26 @@ class ReportingFlowIT {
         assertThat(mvc.get().uri("/api/reports/{id}", UUID.randomUUID()).exchange()).hasStatus(404);
     }
 
-    private void publish(String routingKey, String json, String eventId) {
+    private void publish(final String routingKey, final String json, final String eventId) {
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, routingKey,
                 producerMessage(json, UUID.fromString(eventId), "it-correlation"));
     }
 
     /** One consumer, in order: once a sentinel event is stored, every earlier message was handled. */
     private void awaitAllConsumed() {
-        UUID sentinel = UUID.randomUUID();
+        final UUID sentinel = UUID.randomUUID();
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_FAILED,
                 producerMessage(failedEnvelope(failed(sentinel, "sentinel"))));
         awaitReport(sentinel);
     }
 
-    private MvcTestResult awaitReport(UUID filingId) {
+    private MvcTestResult awaitReport(final UUID filingId) {
         return await().atMost(TIMEOUT).until(
                 () -> mvc.get().uri("/api/reports/{id}", filingId).exchange(),
                 result -> result.getResponse().getStatus() == 200);
     }
 
-    private static String body(MvcTestResult result) {
+    private static String body(final MvcTestResult result) {
         return new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 }

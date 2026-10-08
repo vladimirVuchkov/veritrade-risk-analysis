@@ -18,18 +18,18 @@ public class IdempotencyGuard {
     private final ProcessedEventRepository processedEvents;
     private final Clock clock;
 
-    public IdempotencyGuard(ProcessedEventRepository processedEvents, Clock clock) {
+    public IdempotencyGuard(final ProcessedEventRepository processedEvents, final Clock clock) {
         this.processedEvents = processedEvents;
         this.clock = clock;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public boolean alreadyProcessed(UUID eventId) {
+    public boolean alreadyProcessed(final UUID eventId) {
         return processedEvents.existsById(eventId);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void markProcessed(UUID eventId) {
+    public void markProcessed(final UUID eventId) {
         processedEvents.save(new ProcessedEvent(eventId, clock.instant()));
     }
 }

@@ -91,7 +91,7 @@ class AnalysisEventsIT {
 
     @Test
     void analysisEventsMoveTheFilingThroughItsLifecycle() {
-        UUID filingId = storedFiling();
+        final UUID filingId = storedFiling();
 
         send(EventType.ANALYSIS_STARTED, Contracts.exampleFor(EventType.ANALYSIS_STARTED, filingId));
         awaitStatus(filingId, FilingStatus.ANALYZING);
@@ -102,7 +102,7 @@ class AnalysisEventsIT {
 
     @Test
     void contractExamplesWithAJavaTypeHeaderAreReadByEventType() {
-        UUID exampleFilingId = UUID.fromString(Contracts.example(EventType.ANALYSIS_STARTED)
+        final UUID exampleFilingId = UUID.fromString(Contracts.example(EventType.ANALYSIS_STARTED)
                 .get("payload").get("filingId").asString());
         filings.save(Filing.submit(exampleFilingId, "Acme", "10-K", "text", Instant.now()));
 
@@ -120,8 +120,8 @@ class AnalysisEventsIT {
 
     @Test
     void bogusJavaTypeHeaderIsIgnored() {
-        UUID filingId = storedFiling();
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        final UUID filingId = storedFiling();
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
 
         sendWithTypeHeader(EventType.ANALYSIS_FAILED, event.toString().getBytes(StandardCharsets.UTF_8),
                 "java.lang.Runtime");
@@ -132,8 +132,8 @@ class AnalysisEventsIT {
 
     @Test
     void javaSerializedBodyIsNeverDeserializedAndGoesToTheDeadLetterQueue() {
-        String messageId = UUID.randomUUID().toString();
-        Message message = MessageBuilder.withBody(new byte[] {(byte) 0xAC, (byte) 0xED, 0, 5})
+        final String messageId = UUID.randomUUID().toString();
+        final Message message = MessageBuilder.withBody(new byte[] {(byte) 0xAC, (byte) 0xED, 0, 5})
                 .setContentType(MessageProperties.CONTENT_TYPE_SERIALIZED_OBJECT)
                 .setMessageId(messageId)
                 .setHeader(TYPE_ID_HEADER, "java.lang.Runtime")
@@ -146,9 +146,9 @@ class AnalysisEventsIT {
 
     @Test
     void listenerReceivesTheRawMessageWithoutAJsonPayloadConverter() {
-        AbstractMessageListenerContainer container =
+        final AbstractMessageListenerContainer container =
                 (AbstractMessageListenerContainer) listenerRegistry.getListenerContainers().iterator().next();
-        Object converter = ReflectionTestUtils.invokeMethod(container.getMessageListener(), "getMessageConverter");
+        final Object converter = ReflectionTestUtils.invokeMethod(container.getMessageListener(), "getMessageConverter");
 
         assertThat(listenerRegistry.getListenerContainers()).hasSize(1);
         assertThat(converter).isNotInstanceOf(AbstractJacksonMessageConverter.class);
@@ -158,7 +158,7 @@ class AnalysisEventsIT {
 
     @Test
     void failedEventStoresTheReasonEvenWithoutAStartedEvent() {
-        UUID filingId = storedFiling();
+        final UUID filingId = storedFiling();
 
         send(EventType.ANALYSIS_FAILED, Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId));
 
@@ -169,7 +169,7 @@ class AnalysisEventsIT {
 
     @Test
     void lateContradictoryAndDuplicateEventsAreAcknowledgedNotDeadLettered() {
-        UUID filingId = storedFiling();
+        final UUID filingId = storedFiling();
         send(EventType.ANALYSIS_COMPLETED, Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, filingId));
         awaitStatus(filingId, FilingStatus.COMPLETED);
 
@@ -187,8 +187,8 @@ class AnalysisEventsIT {
 
     @Test
     void eventWithUnknownFieldsIsProcessed() {
-        UUID filingId = storedFiling();
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, filingId);
+        final UUID filingId = storedFiling();
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, filingId);
         event.put("addedLater", true);
         ((ObjectNode) event.get("payload")).put("worker", "analysis-2");
 
@@ -199,8 +199,8 @@ class AnalysisEventsIT {
 
     @Test
     void unreadableMessageGoesStraightToTheDeadLetterQueueWithoutRetries() {
-        String messageId = UUID.randomUUID().toString();
-        Instant sentAt = Instant.now();
+        final String messageId = UUID.randomUUID().toString();
+        final Instant sentAt = Instant.now();
 
         rabbitTemplate.send("veritrade.events", "analysis.started", Broker.json("this is not json", messageId));
 
@@ -210,8 +210,8 @@ class AnalysisEventsIT {
 
     @Test
     void invalidEventIsReadOnceAndNotRetried() {
-        UUID filingId = UUID.randomUUID();
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        final UUID filingId = UUID.randomUUID();
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
         ((ObjectNode) event.get("payload")).remove("reason");
 
         assertDeadLettered(event, "analysis.failed");
@@ -222,10 +222,10 @@ class AnalysisEventsIT {
     /** Contract, "Event versioning": no retries, not applied, kept in the dead-letter queue for a replay. */
     @Test
     void newerEventVersionGoesStraightToTheDeadLetterQueueAndIsNotApplied() {
-        UUID filingId = storedFiling();
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, filingId);
+        final UUID filingId = storedFiling();
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, filingId);
         event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
-        Instant sentAt = Instant.now();
+        final Instant sentAt = Instant.now();
 
         assertDeadLettered(event, "analysis.completed");
 
@@ -238,10 +238,10 @@ class AnalysisEventsIT {
     /** Contract, "Text limits": a reason one UTF-16 unit over the limit is dead-lettered, not cut. */
     @Test
     void failureReasonOverTheLimitGoesStraightToTheDeadLetterQueueAndIsNotApplied() {
-        UUID filingId = storedFiling();
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        final UUID filingId = storedFiling();
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
         ((ObjectNode) event.get("payload")).put("reason", "r".repeat(MAX_REASON_LENGTH - 1) + "\uD83D\uDCC8");
-        Instant sentAt = Instant.now();
+        final Instant sentAt = Instant.now();
 
         assertDeadLettered(event, "analysis.failed");
 
@@ -253,9 +253,9 @@ class AnalysisEventsIT {
 
     @Test
     void failureReasonOfExactlyTheLimitIsStoredWhole() {
-        UUID filingId = storedFiling();
-        String reason = "r".repeat(MAX_REASON_LENGTH - 2) + "\uD83D\uDCC8";
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
+        final UUID filingId = storedFiling();
+        final String reason = "r".repeat(MAX_REASON_LENGTH - 2) + "\uD83D\uDCC8";
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_FAILED, filingId);
         ((ObjectNode) event.get("payload")).put("reason", reason);
 
         send(EventType.ANALYSIS_FAILED, event);
@@ -266,7 +266,7 @@ class AnalysisEventsIT {
 
     @Test
     void unknownEventTypeGoesToTheDeadLetterQueue() {
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, UUID.randomUUID());
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, UUID.randomUUID());
         event.put("eventType", "ANALYSIS_PAUSED");
 
         assertDeadLettered(event, "analysis.paused");
@@ -274,7 +274,7 @@ class AnalysisEventsIT {
 
     @Test
     void eventWithoutFilingIdGoesToTheDeadLetterQueue() {
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, UUID.randomUUID());
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_COMPLETED, UUID.randomUUID());
         ((ObjectNode) event.get("payload")).remove("filingId");
 
         assertDeadLettered(event, "analysis.completed");
@@ -287,13 +287,13 @@ class AnalysisEventsIT {
 
     @Test
     void transientFailureIsRetriedThreeTimesThenDeadLettered() {
-        UUID filingId = storedFiling();
+        final UUID filingId = storedFiling();
         doThrow(new IllegalStateException("database unavailable"))
                 .when(statusService).apply(argThat(update -> update != null && update.filingId().equals(filingId)));
 
         send(EventType.ANALYSIS_STARTED, Contracts.exampleFor(EventType.ANALYSIS_STARTED, filingId));
 
-        UUID eventId = EventIds.forFiling(filingId, EventType.ANALYSIS_STARTED);
+        final UUID eventId = EventIds.forFiling(filingId, EventType.ANALYSIS_STARTED);
         assertThat(Broker.receiveMatching(rabbitTemplate, DLQ, Broker.withMessageId(eventId), WAIT)).isNotNull();
         verify(statusService, timeout(WAIT.toMillis()).times(3)).apply(argThat(update -> update.filingId().equals(filingId)));
         assertThat(filings.findById(filingId).orElseThrow().status()).isEqualTo(FilingStatus.SUBMITTED);
@@ -312,7 +312,7 @@ class AnalysisEventsIT {
 
     @Test
     void aDeclarationWithOtherArgumentsIsRefused() {
-        Map<String, Object> withTtl = new HashMap<>(contractArguments());
+        final Map<String, Object> withTtl = new HashMap<>(contractArguments());
         withTtl.put("x-message-ttl", 60_000);
 
         assertThatThrownBy(() -> rabbitTemplate.execute(channel -> channel.queueDeclare(QUEUE, true, false, false, withTtl)))
@@ -323,24 +323,24 @@ class AnalysisEventsIT {
         return Map.of("x-dead-letter-exchange", "veritrade.dlx", "x-dead-letter-routing-key", QUEUE);
     }
 
-    private void assertDeadLettered(ObjectNode event, String routingKey) {
-        String messageId = event.get("eventId").asString();
+    private void assertDeadLettered(final ObjectNode event, final String routingKey) {
+        final String messageId = event.get("eventId").asString();
         rabbitTemplate.send("veritrade.events", routingKey, Broker.json(event.toString(), messageId));
 
-        Message dead = Broker.receiveMatching(rabbitTemplate, DLQ, Broker.withMessageId(messageId), WAIT);
+        final Message dead = Broker.receiveMatching(rabbitTemplate, DLQ, Broker.withMessageId(messageId), WAIT);
         assertThat(dead).isNotNull();
         assertThat(dead.getMessageProperties().getHeaders()).containsKey("x-death");
     }
 
-    private void assertNotDeadLettered(UUID filingId) {
-        Message dead = Broker.receiveMatching(rabbitTemplate, DLQ,
+    private void assertNotDeadLettered(final UUID filingId) {
+        final Message dead = Broker.receiveMatching(rabbitTemplate, DLQ,
                 message -> new String(message.getBody()).contains(filingId.toString()), Duration.ofSeconds(1));
         assertThat(dead).isNull();
         assertThat(admin.getQueueInfo(QUEUE).getMessageCount()).isZero();
     }
 
-    private void sendWithTypeHeader(EventType type, byte[] body, String typeId) {
-        Message message = MessageBuilder.withBody(body)
+    private void sendWithTypeHeader(final EventType type, final byte[] body, final String typeId) {
+        final Message message = MessageBuilder.withBody(body)
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setMessageId(UUID.randomUUID().toString())
                 .setHeader(TYPE_ID_HEADER, typeId)
@@ -348,11 +348,11 @@ class AnalysisEventsIT {
         rabbitTemplate.send("veritrade.events", type.routingKey(), message);
     }
 
-    private void send(EventType type, ObjectNode event) {
+    private void send(final EventType type, final ObjectNode event) {
         rabbitTemplate.send("veritrade.events", type.routingKey(), Broker.json(event.toString(), event.get("eventId").asString()));
     }
 
-    private void awaitStatus(UUID filingId, FilingStatus status) {
+    private void awaitStatus(final UUID filingId, final FilingStatus status) {
         await().atMost(WAIT).untilAsserted(() ->
                 assertThat(filings.findById(filingId).orElseThrow().status()).isEqualTo(status));
     }

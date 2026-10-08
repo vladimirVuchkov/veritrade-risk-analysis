@@ -27,14 +27,14 @@ class ConcurrencyE2E extends E2ETestBase {
     @Test
     void parallelFilingsAllCompleteWithOneConsistentReportEachAndNothingDeadLettered() {
         DeadLetters.ALL.forEach(broker::purge);
-        FilingRequest filing = system.demoFiling();
+        final FilingRequest filing = system.demoFiling();
 
-        List<UUID> filingIds = submitInParallel(filing);
+        final List<UUID> filingIds = submitInParallel(filing);
 
         assertThat(Set.copyOf(filingIds)).hasSize(PARALLEL_FILINGS);
-        List<JsonNode> reports = filingIds.stream().map(ConcurrencyE2E::completedReport).toList();
+        final List<JsonNode> reports = filingIds.stream().map(ConcurrencyE2E::completedReport).toList();
         reports.forEach(report -> ReportAssertions.assertConsistentCompletedReport(report, filing.content()));
-        Set<String> expectedFindings = findingKeys(reports.getFirst());
+        final Set<String> expectedFindings = findingKeys(reports.getFirst());
         assertThat(reports).allSatisfy(report -> assertThat(findingKeys(report)).isEqualTo(expectedFindings));
         DeadLetters.ALL.forEach(queue -> assertThat(broker.peek(queue)).as(queue).isEmpty());
         await("statistics show empty dead-letter queues").atMost(Timeouts.QUEUE_STATISTICS)
@@ -42,29 +42,29 @@ class ConcurrencyE2E extends E2ETestBase {
                 .until(() -> DeadLetters.ALL.stream().allMatch(queue -> broker.messageCount(queue) == 0));
     }
 
-    private static List<UUID> submitInParallel(FilingRequest filing) {
+    private static List<UUID> submitInParallel(final FilingRequest filing) {
         try (ExecutorService pool = Executors.newFixedThreadPool(PARALLEL_FILINGS)) {
-            List<Future<UUID>> submissions = IntStream.range(0, PARALLEL_FILINGS)
+            final List<Future<UUID>> submissions = IntStream.range(0, PARALLEL_FILINGS)
                     .mapToObj(i -> pool.submit(() -> api.submitAccepted(filing.withTitle("Parallel " + i))))
                     .toList();
             return submissions.stream().map(ConcurrencyE2E::result).toList();
         }
     }
 
-    private static JsonNode completedReport(UUID filingId) {
+    private static JsonNode completedReport(final UUID filingId) {
         api.awaitStatus(filingId, "COMPLETED");
         return api.awaitReport(filingId);
     }
 
-    private static UUID result(Future<UUID> submission) {
+    private static UUID result(final Future<UUID> submission) {
         try {
             return submission.get();
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new AssertionError("a parallel submit failed", e);
         }
     }
 
-    private static Set<String> findingKeys(JsonNode report) {
+    private static Set<String> findingKeys(final JsonNode report) {
         return ReportAssertions.findings(report).stream().map(ReportAssertions::findingKey)
                 .collect(Collectors.toSet());
     }

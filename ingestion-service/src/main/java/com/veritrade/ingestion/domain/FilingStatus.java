@@ -16,7 +16,7 @@ public enum FilingStatus {
     }
 
     /** A move to the current status is a duplicate; a move the lifecycle forbids is rejected. */
-    public StatusChange transitionTo(FilingStatus target) {
+    public StatusChange transitionTo(final FilingStatus target) {
         if (this == target) {
             return StatusChange.DUPLICATE;
         }
@@ -24,11 +24,11 @@ public enum FilingStatus {
     }
 
     /** Only a failed filing keeps a failure reason. */
-    public String failureReasonToKeep(String reason) {
+    public String failureReasonToKeep(final String reason) {
         return this == FAILED ? reason : null;
     }
 
-    public boolean canMoveTo(FilingStatus target) {
+    public boolean canMoveTo(final FilingStatus target) {
         return switch (this) {
             case SUBMITTED -> target != SUBMITTED;
             case ANALYZING -> target.isTerminal();

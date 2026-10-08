@@ -43,8 +43,8 @@ class InputValidationE2E extends E2ETestBase {
         "{\"companyName\":\"\",\"title\":\"\",\"content\":\"\"}",
         "{\"companyName\":\"   \",\"title\":\"\\t\",\"content\":\"\\n \"}",
         "{\"companyName\":null,\"title\":null,\"content\":null}"})
-    void blankOrMissingFieldsAreRejectedWithOneErrorPerField(String body) {
-        ApiResponse response = api.submit(body, Map.of());
+    void blankOrMissingFieldsAreRejectedWithOneErrorPerField(final String body) {
+        final ApiResponse response = api.submit(body, Map.of());
 
         assertBadRequest(response);
         assertThat(response.json().path("errors").toString())
@@ -53,11 +53,11 @@ class InputValidationE2E extends E2ETestBase {
 
     @ParameterizedTest
     @CsvSource({"companyName", "title", "content"})
-    void eachMissingFieldIsRejected(String field) {
-        var body = VALID.toJsonNode();
+    void eachMissingFieldIsRejected(final String field) {
+        final var body = VALID.toJsonNode();
         body.remove(field);
 
-        ApiResponse response = api.submit(body.toString(), Map.of());
+        final ApiResponse response = api.submit(body.toString(), Map.of());
 
         assertBadRequest(response);
         assertThat(response.json().path("errors").toString()).contains(field);
@@ -65,21 +65,21 @@ class InputValidationE2E extends E2ETestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"{not json", "", "null", "[]", "\"text\"", "{\"companyName\":\"A\",}"})
-    void malformedJsonIsABadRequestProblem(String body) {
+    void malformedJsonIsABadRequestProblem(final String body) {
         assertBadRequest(api.submit(body, Map.of()));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"text/plain", "application/xml", "application/x-www-form-urlencoded"})
-    void wrongContentTypeIsAnUnsupportedMediaTypeProblem(String contentType) {
-        ApiResponse response = api.post(Api.FILINGS, BodyPublishers.ofString(VALID.toJson()), contentType, Map.of());
+    void wrongContentTypeIsAnUnsupportedMediaTypeProblem(final String contentType) {
+        final ApiResponse response = api.post(Api.FILINGS, BodyPublishers.ofString(VALID.toJson()), contentType, Map.of());
 
         assertThat(response.isProblem(UNSUPPORTED_MEDIA_TYPE)).as(response.toString()).isTrue();
     }
 
     @Test
     void missingContentTypeIsAnUnsupportedMediaTypeProblem() {
-        ApiResponse response = api.post(Api.FILINGS, BodyPublishers.ofString(VALID.toJson()), null, Map.of());
+        final ApiResponse response = api.post(Api.FILINGS, BodyPublishers.ofString(VALID.toJson()), null, Map.of());
 
         assertThat(response.isProblem(UNSUPPORTED_MEDIA_TYPE)).as(response.toString()).isTrue();
     }
@@ -91,7 +91,7 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void contentOfTwoMegabytesPlusOneByteIsABadRequestNotPayloadTooLarge() {
-        ApiResponse response = api.submit(VALID.withContent("a".repeat(MAX_CONTENT_BYTES + 1)));
+        final ApiResponse response = api.submit(VALID.withContent("a".repeat(MAX_CONTENT_BYTES + 1)));
 
         assertBadRequest(response);
         assertThat(response.json().path("errors").toString()).contains("content");
@@ -99,7 +99,7 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void twoByteCharactersAtTheByteLimitAreAcceptedAndOneMoreByteIsNot() {
-        String atLimit = TWO_BYTE_CHAR.repeat(MAX_CONTENT_BYTES / TWO_BYTES);
+        final String atLimit = TWO_BYTE_CHAR.repeat(MAX_CONTENT_BYTES / TWO_BYTES);
         assertThat(atLimit.getBytes(StandardCharsets.UTF_8)).hasSize(MAX_CONTENT_BYTES);
 
         assertAccepted(VALID.withContent(atLimit));
@@ -108,7 +108,7 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void emojiAtTheByteLimitAreAcceptedAndOneMoreByteIsNot() {
-        String atLimit = EMOJI.repeat(MAX_CONTENT_BYTES / EMOJI_BYTES);
+        final String atLimit = EMOJI.repeat(MAX_CONTENT_BYTES / EMOJI_BYTES);
         assertThat(atLimit.getBytes(StandardCharsets.UTF_8)).hasSize(MAX_CONTENT_BYTES);
 
         assertAccepted(VALID.withContent(atLimit));
@@ -123,7 +123,7 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void companyNameLengthCountsUtf16UnitsSoEmojiCountTwice() {
-        String atLimit = EMOJI.repeat(MAX_COMPANY_NAME_UNITS / EMOJI_UNITS);
+        final String atLimit = EMOJI.repeat(MAX_COMPANY_NAME_UNITS / EMOJI_UNITS);
 
         assertAccepted(VALID.withCompanyName(atLimit));
         assertFieldRejected(VALID.withCompanyName(atLimit + "c"), "companyName");
@@ -138,7 +138,7 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void titleLengthCountsUtf16UnitsSoEmojiCountTwice() {
-        String atLimit = EMOJI.repeat(MAX_TITLE_UNITS / EMOJI_UNITS);
+        final String atLimit = EMOJI.repeat(MAX_TITLE_UNITS / EMOJI_UNITS);
 
         assertAccepted(VALID.withTitle(atLimit));
         assertFieldRejected(VALID.withTitle(atLimit + "t"), "title");
@@ -146,35 +146,35 @@ class InputValidationE2E extends E2ETestBase {
 
     @Test
     void surroundingWhitespaceIsStrippedBeforeTheLengthCheck() {
-        String name = "c".repeat(MAX_COMPANY_NAME_UNITS);
+        final String name = "c".repeat(MAX_COMPANY_NAME_UNITS);
 
-        UUID filingId = assertAccepted(VALID.withCompanyName("  " + name + "\t"));
+        final UUID filingId = assertAccepted(VALID.withCompanyName("  " + name + "\t"));
 
         assertThat(api.filing(filingId).json().path("companyName").asString()).isEqualTo(name);
     }
 
     @Test
     void bodyOverTheNginxLimitIsAPayloadTooLargeProblem() {
-        ApiResponse response = api.submit(VALID.withContent("a".repeat(NGINX_BODY_LIMIT_BYTES + 1)));
+        final ApiResponse response = api.submit(VALID.withContent("a".repeat(NGINX_BODY_LIMIT_BYTES + 1)));
 
         assertThat(response.isProblem(PAYLOAD_TOO_LARGE)).as(response.toString()).isTrue();
     }
 
-    private static UUID assertAccepted(FilingRequest filing) {
-        ApiResponse response = api.submit(filing);
+    private static UUID assertAccepted(final FilingRequest filing) {
+        final ApiResponse response = api.submit(filing);
         assertThat(response.status()).as(response.toString()).isEqualTo(ACCEPTED);
-        UUID filingId = UUID.fromString(response.json().path("filingId").asString());
+        final UUID filingId = UUID.fromString(response.json().path("filingId").asString());
         assertThat(api.filing(filingId).json().path("title").asString()).isEqualTo(filing.title().strip());
         return filingId;
     }
 
-    private static void assertFieldRejected(FilingRequest filing, String field) {
-        ApiResponse response = api.submit(filing);
+    private static void assertFieldRejected(final FilingRequest filing, final String field) {
+        final ApiResponse response = api.submit(filing);
         assertBadRequest(response);
         assertThat(response.json().path("errors").toString()).contains(field);
     }
 
-    private static void assertBadRequest(ApiResponse response) {
+    private static void assertBadRequest(final ApiResponse response) {
         assertThat(response.isProblem(BAD_REQUEST)).as(response.toString()).isTrue();
         Contracts.assertMatchesApiSchema("ProblemDetail", response.json());
     }

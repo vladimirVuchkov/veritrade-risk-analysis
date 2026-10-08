@@ -30,14 +30,14 @@ class WhitespaceToleranceTest {
         "\\Qa.b\\E c => \\Qa.b\\E" + RUN + "c",
         "[a-z]+ [0-9] => [a-z]+" + RUN + "[0-9]"
     })
-    void rewritesEveryLiteralSpaceRunOutsideCharacterClasses(String source, String expected) {
+    void rewritesEveryLiteralSpaceRunOutsideCharacterClasses(final String source, final String expected) {
         assertThat(WhitespaceTolerance.rewrite(source)).isEqualTo(expected);
         assertThat(Pattern.compile(expected)).isNotNull();
     }
 
     @ParameterizedTest(name = "[{0}]")
     @ValueSource(strings = {"sole[- ]source", "a[^ ]b", "a[x[ ]]b", "\\Qa b\\E", "\\Qa b"})
-    void rejectsASpaceThatCanOnlyMatchOneCharacter(String source) {
+    void rejectsASpaceThatCanOnlyMatchOneCharacter(final String source) {
         assertThatThrownBy(() -> WhitespaceTolerance.rewrite(source))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("space inside");
@@ -45,13 +45,13 @@ class WhitespaceToleranceTest {
 
     @ParameterizedTest(name = "[{0}]")
     @ValueSource(strings = {" ", " ", " ", "　", "\n", "\r", "\u000B", "\f", "\u0085", " "})
-    void theRunMatchesUnicodeAndVerticalWhitespace(String whitespace) {
+    void theRunMatchesUnicodeAndVerticalWhitespace(final String whitespace) {
         assertThat(Pattern.compile(RUN).matcher(whitespace).matches()).isTrue();
     }
 
     @ParameterizedTest(name = "[{0}]")
     @ValueSource(strings = {"x", "-", "_", "​"})
-    void theRunDoesNotMatchOtherCharacters(String other) {
+    void theRunDoesNotMatchOtherCharacters(final String other) {
         assertThat(Pattern.compile(RUN).matcher(other).matches()).isFalse();
     }
 }

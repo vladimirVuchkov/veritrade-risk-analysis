@@ -62,7 +62,7 @@ class FilingSubmittedListenerTest {
 
     @Test
     void publishesStartedThenCompletedForAValidEvent() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
 
         listener().onFilingSubmitted(message(filingSubmitted(filingId)));
 
@@ -73,7 +73,7 @@ class FilingSubmittedListenerTest {
                 EventIds.forFiling(filingId, EventType.ANALYSIS_COMPLETED));
         assertThat(published).extracting(EventEnvelope::correlationId)
                 .containsOnly("c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20");
-        AnalysisCompletedPayload completed = (AnalysisCompletedPayload) published.getLast().payload();
+        final AnalysisCompletedPayload completed = (AnalysisCompletedPayload) published.getLast().payload();
         assertThat(completed.filingId()).isEqualTo(filingId);
         assertThat(completed.summary().totalFindings()).isEqualTo(3);
         assertThat(completed.summary().overallRiskLevel()).isEqualTo(RiskLevel.HIGH);
@@ -89,7 +89,7 @@ class FilingSubmittedListenerTest {
 
     @Test
     void ignoresUnknownFields() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("addedInVersion2", "ignored");
         event.putObject("metadata").put("source", "batch");
         ((ObjectNode) event.get("payload")).put("industry", "Manufacturing");
@@ -101,7 +101,7 @@ class FilingSubmittedListenerTest {
 
     @Test
     void acceptsTheCurrentEventVersion() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("eventVersion", EventEnvelope.CURRENT_VERSION);
 
         listener().onFilingSubmitted(message(event));
@@ -111,8 +111,8 @@ class FilingSubmittedListenerTest {
 
     @ParameterizedTest(name = "eventVersion {0}")
     @ValueSource(ints = {EventEnvelope.CURRENT_VERSION + 1, Integer.MAX_VALUE})
-    void rejectsANewerEventVersionWithoutPublishingAnything(int version) {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+    void rejectsANewerEventVersionWithoutPublishingAnything(final int version) {
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("eventVersion", version);
 
         assertThatThrownBy(() -> listener().onFilingSubmitted(message(event)))
@@ -123,20 +123,20 @@ class FilingSubmittedListenerTest {
 
     @Test
     void acceptsWhitespaceOnlyContentAndReportsNoRisk() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         ((ObjectNode) event.get("payload")).put("content", "   ");
 
         listener().onFilingSubmitted(message(event));
 
-        AnalysisCompletedPayload completed = (AnalysisCompletedPayload) published.getLast().payload();
+        final AnalysisCompletedPayload completed = (AnalysisCompletedPayload) published.getLast().payload();
         assertThat(completed.findings()).isEmpty();
         assertThat(completed.summary().overallRiskLevel()).isEqualTo(RiskLevel.NONE);
     }
 
     @ParameterizedTest(name = "missing {0}")
     @ValueSource(strings = {"eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "payload"})
-    void rejectsAnEnvelopeWithAMissingField(String field) {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+    void rejectsAnEnvelopeWithAMissingField(final String field) {
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.remove(field);
 
         assertInvalid(event.toString());
@@ -144,8 +144,8 @@ class FilingSubmittedListenerTest {
 
     @ParameterizedTest(name = "missing payload.{0}")
     @ValueSource(strings = {"filingId", "companyName", "title", "content", "submittedAt"})
-    void rejectsAPayloadWithAMissingField(String field) {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+    void rejectsAPayloadWithAMissingField(final String field) {
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         ((ObjectNode) event.get("payload")).remove(field);
 
         assertThatThrownBy(() -> listener().onFilingSubmitted(message(event)))
@@ -156,9 +156,9 @@ class FilingSubmittedListenerTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidValues")
-    void rejectsEmptyOrMalformedValues(String problem, String path, String value) {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
-        ObjectNode target = path.startsWith("payload.") ? (ObjectNode) event.get("payload") : event;
+    void rejectsEmptyOrMalformedValues(final String problem, final String path, final String value) {
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode target = path.startsWith("payload.") ? (ObjectNode) event.get("payload") : event;
         target.put(path.replace("payload.", ""), value);
 
         assertInvalid(event.toString());
@@ -179,8 +179,8 @@ class FilingSubmittedListenerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"ANALYSIS_STARTED", "ANALYSIS_COMPLETED", "ANALYSIS_FAILED"})
-    void rejectsAnotherEventTypeOnTheQueue(String eventType) {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+    void rejectsAnotherEventTypeOnTheQueue(final String eventType) {
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("eventType", eventType);
 
         assertThatThrownBy(() -> listener().onFilingSubmitted(message(event)))
@@ -191,7 +191,7 @@ class FilingSubmittedListenerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"{not json", "", "null", "[]", "42", "\"text\"", "{\"eventType\":"})
-    void rejectsMalformedJson(String body) {
+    void rejectsMalformedJson(final String body) {
         assertInvalid(body);
     }
 
@@ -208,7 +208,7 @@ class FilingSubmittedListenerTest {
 
     @Test
     void aRedeliveredFilingProducesEventsWithTheSameIds() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
 
         listener().onFilingSubmitted(message(event.toString(), false));
         listener().onFilingSubmitted(message(event.toString(), true));
@@ -220,7 +220,7 @@ class FilingSubmittedListenerTest {
         verify(publisher, times(4)).publish(any());
     }
 
-    private void assertInvalid(String body) {
+    private void assertInvalid(final String body) {
         assertThatThrownBy(() -> listener().onFilingSubmitted(message(body, false)))
                 .isInstanceOf(InvalidFilingMessageException.class);
         verifyNoInteractions(publisher);

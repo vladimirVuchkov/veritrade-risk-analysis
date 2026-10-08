@@ -69,9 +69,9 @@ class FilingApiTest {
 
     @Test
     void storesTheFilingAndItsEventTogether() throws Exception {
-        UUID id = submitted(submit("Acme", "10-K", "Risk factors.").andExpect(status().isAccepted()));
+        final UUID id = submitted(submit("Acme", "10-K", "Risk factors.").andExpect(status().isAccepted()));
 
-        OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
+        final OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
         assertThat(row.routingKey()).isEqualTo("filing.submitted");
         assertThat(row.publishedAt()).isNull();
         assertThat(Contracts.validate(EventType.FILING_SUBMITTED, row.payload())).isEmpty();
@@ -83,22 +83,22 @@ class FilingApiTest {
 
     @Test
     void storesTheRequestCorrelationIdWithTheEvent() throws Exception {
-        MvcResult result = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
+        final MvcResult result = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
                         .header("X-Correlation-Id", "trace-77").content(body("Acme", "10-K", "text")))
                 .andExpect(status().isAccepted()).andReturn();
 
-        UUID id = UUID.fromString(jsonMapper.readTree(result.getResponse().getContentAsString()).get("filingId").asString());
-        OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
+        final UUID id = UUID.fromString(jsonMapper.readTree(result.getResponse().getContentAsString()).get("filingId").asString());
+        final OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
         assertThat(row.correlationId()).isEqualTo("trace-77");
         assertThat(jsonMapper.readTree(row.payload()).get("correlationId").asString()).isEqualTo("trace-77");
     }
 
     @Test
     void acceptsContentOfExactlyTwoMegabytes() throws Exception {
-        UUID id = submitted(submit("Acme", "10-K", "a".repeat(TWO_MB)).andExpect(status().isAccepted()));
+        final UUID id = submitted(submit("Acme", "10-K", "a".repeat(TWO_MB)).andExpect(status().isAccepted()));
 
         assertThat(filings.findById(id).orElseThrow().content()).hasSize(TWO_MB);
-        OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
+        final OutboxEvent row = outbox.findById(EventIds.forFiling(id, EventType.FILING_SUBMITTED)).orElseThrow();
         assertThat(Contracts.validate(EventType.FILING_SUBMITTED, row.payload())).isEmpty();
     }
 
@@ -113,8 +113,8 @@ class FilingApiTest {
 
     @Test
     void measuresMultibyteContentInBytes() throws Exception {
-        String exactly = "a".repeat(TWO_MB - 3) + EURO;
-        String overByOne = "a".repeat(TWO_MB - 2) + EURO;
+        final String exactly = "a".repeat(TWO_MB - 3) + EURO;
+        final String overByOne = "a".repeat(TWO_MB - 2) + EURO;
 
         submit("Acme", "10-K", exactly).andExpect(status().isAccepted());
         expectBadRequest(submit("Acme", "10-K", overByOne));
@@ -122,10 +122,10 @@ class FilingApiTest {
 
     @Test
     void storesCompanyNameAndTitleOfExactlyTheColumnLength() throws Exception {
-        String company = EMOJI.repeat(100);
-        String title = EURO.repeat(300);
+        final String company = EMOJI.repeat(100);
+        final String title = EURO.repeat(300);
 
-        UUID id = submitted(submit(company, title, "text").andExpect(status().isAccepted()));
+        final UUID id = submitted(submit(company, title, "text").andExpect(status().isAccepted()));
 
         mvc.perform(get("/api/filings/{id}", id))
                 .andExpect(jsonPath("$.companyName").value(company))
@@ -178,9 +178,9 @@ class FilingApiTest {
 
     @Test
     void listsNewestFirstWithTheDefaultLimit() throws Exception {
-        List<UUID> ids = submitMany(22);
+        final List<UUID> ids = submitMany(22);
 
-        MvcResult result = mvc.perform(get("/api/filings")).andExpect(status().isOk())
+        final MvcResult result = mvc.perform(get("/api/filings")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(20))).andReturn();
 
         assertThat(listedIds(result)).containsExactlyElementsOf(ids.reversed().subList(0, 20));
@@ -188,9 +188,9 @@ class FilingApiTest {
 
     @Test
     void listsExactlyTheRequestedNumber() throws Exception {
-        List<UUID> ids = submitMany(3);
+        final List<UUID> ids = submitMany(3);
 
-        MvcResult result = mvc.perform(get("/api/filings").param("limit", "1"))
+        final MvcResult result = mvc.perform(get("/api/filings").param("limit", "1"))
                 .andExpect(jsonPath("$", hasSize(1))).andReturn();
 
         assertThat(listedIds(result)).containsExactly(ids.getLast());
@@ -211,14 +211,14 @@ class FilingApiTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "101", "2147483647"})
-    void rejectsLimitsOutOfRange(String limit) throws Exception {
+    void rejectsLimitsOutOfRange(final String limit) throws Exception {
         expectBadRequest(mvc.perform(get("/api/filings").param("limit", limit)))
                 .andExpect(jsonPath("$.detail").value("limit must be between 1 and 100"));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"abc", "1.0", "10a", "2147483648"})
-    void rejectsLimitsThatAreNotIntegers(String limit) throws Exception {
+    void rejectsLimitsThatAreNotIntegers(final String limit) throws Exception {
         expectBadRequest(mvc.perform(get("/api/filings").param("limit", limit)));
     }
 
@@ -231,44 +231,44 @@ class FilingApiTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"not-a-uuid", "123", "3f2b8c1e-6a4d-4e2f-9b7a"})
-    void malformedFilingIdIs400(String id) throws Exception {
+    void malformedFilingIdIs400(final String id) throws Exception {
         expectBadRequest(mvc.perform(get("/api/filings/{id}", id)))
                 .andExpect(jsonPath("$.detail", containsString("filingId")));
     }
 
-    private List<UUID> submitMany(int count) throws Exception {
-        List<UUID> ids = new ArrayList<>();
+    private List<UUID> submitMany(final int count) throws Exception {
+        final List<UUID> ids = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             ids.add(submitted(submit("Company " + i, "Title " + i, "text")));
         }
         return ids;
     }
 
-    private List<UUID> listedIds(MvcResult result) throws Exception {
+    private List<UUID> listedIds(final MvcResult result) throws Exception {
         return jsonMapper.readTree(result.getResponse().getContentAsString()).valueStream()
                 .map(node -> UUID.fromString(node.get("filingId").asString()))
                 .toList();
     }
 
-    private UUID submitted(ResultActions actions) throws Exception {
-        String json = actions.andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+    private UUID submitted(final ResultActions actions) throws Exception {
+        final String json = actions.andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
         return UUID.fromString(jsonMapper.readTree(json).get("filingId").asString());
     }
 
-    private ResultActions submit(String companyName, String title, String content) throws Exception {
+    private ResultActions submit(final String companyName, final String title, final String content) throws Exception {
         return mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
                 .content(body(companyName, title, content)));
     }
 
-    private String body(String companyName, String title, String content) {
-        Map<String, String> body = new HashMap<>();
+    private String body(final String companyName, final String title, final String content) {
+        final Map<String, String> body = new HashMap<>();
         body.put("companyName", companyName);
         body.put("title", title);
         body.put("content", content);
         return jsonMapper.writeValueAsString(body);
     }
 
-    private static ResultActions expectBadRequest(ResultActions actions) throws Exception {
+    private static ResultActions expectBadRequest(final ResultActions actions) throws Exception {
         return actions.andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400));

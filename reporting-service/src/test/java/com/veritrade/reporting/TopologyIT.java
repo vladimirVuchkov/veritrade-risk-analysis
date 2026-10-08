@@ -29,7 +29,7 @@ class TopologyIT {
     private static final String SERVER_DEFAULT_QUEUE_TYPE = "x-queue-type";
 
     @DynamicPropertySource
-    static void rabbit(DynamicPropertyRegistry registry) {
+    static void rabbit(final DynamicPropertyRegistry registry) {
         RabbitTestContainer.register(registry, VHOST);
     }
 
@@ -38,8 +38,8 @@ class TopologyIT {
 
     @Test
     void exchangesAreDeclaredAsDocumented() {
-        JsonNode events = management("exchanges/" + VHOST + "/veritrade.events");
-        JsonNode dlx = management("exchanges/" + VHOST + "/veritrade.dlx");
+        final JsonNode events = management("exchanges/" + VHOST + "/veritrade.events");
+        final JsonNode dlx = management("exchanges/" + VHOST + "/veritrade.dlx");
 
         assertExchange(events, "topic");
         assertExchange(dlx, "direct");
@@ -47,7 +47,7 @@ class TopologyIT {
 
     @Test
     void workQueueIsDurableClassicWithOnlyTheDeadLetterArguments() {
-        JsonNode queue = management("queues/" + VHOST + "/reporting.analysis-results");
+        final JsonNode queue = management("queues/" + VHOST + "/reporting.analysis-results");
 
         assertThat(queue.get("durable").asBoolean()).isTrue();
         assertThat(queue.get("auto_delete").asBoolean()).isFalse();
@@ -60,7 +60,7 @@ class TopologyIT {
 
     @Test
     void deadLetterQueueIsDurableWithoutArguments() {
-        JsonNode dlq = management("queues/" + VHOST + "/reporting.analysis-results.dlq");
+        final JsonNode dlq = management("queues/" + VHOST + "/reporting.analysis-results.dlq");
 
         assertThat(dlq.get("durable").asBoolean()).isTrue();
         assertThat(dlq.get("auto_delete").asBoolean()).isFalse();
@@ -70,7 +70,7 @@ class TopologyIT {
 
     @Test
     void workQueueIsBoundToCompletedAndFailedOnly() {
-        JsonNode bindings = management("exchanges/" + VHOST + "/veritrade.events/bindings/source");
+        final JsonNode bindings = management("exchanges/" + VHOST + "/veritrade.events/bindings/source");
 
         assertThat(routingKeysTo(bindings, "reporting.analysis-results"))
                 .containsExactlyInAnyOrder("analysis.completed", "analysis.failed");
@@ -78,7 +78,7 @@ class TopologyIT {
 
     @Test
     void deadLetterQueueIsBoundToTheDeadLetterExchangeByQueueName() {
-        JsonNode bindings = management("exchanges/" + VHOST + "/veritrade.dlx/bindings/source");
+        final JsonNode bindings = management("exchanges/" + VHOST + "/veritrade.dlx/bindings/source");
 
         assertThat(routingKeysTo(bindings, "reporting.analysis-results.dlq"))
                 .containsExactly("reporting.analysis-results");
@@ -86,11 +86,11 @@ class TopologyIT {
 
     @Test
     void redeclaringWithTheDocumentedArgumentsIsIdempotentAndDifferentArgumentsAreRefused() {
-        Queue documented = QueueBuilder.durable("reporting.analysis-results")
+        final Queue documented = QueueBuilder.durable("reporting.analysis-results")
                 .deadLetterExchange("veritrade.dlx")
                 .deadLetterRoutingKey("reporting.analysis-results")
                 .build();
-        Queue withTtl = QueueBuilder.durable("reporting.analysis-results")
+        final Queue withTtl = QueueBuilder.durable("reporting.analysis-results")
                 .deadLetterExchange("veritrade.dlx")
                 .deadLetterRoutingKey("reporting.analysis-results")
                 .ttl(1)
@@ -106,15 +106,15 @@ class TopologyIT {
      * The queue arguments without {@code x-queue-type: classic}, which RabbitMQ 4 adds on the server side
      * as the default queue type; Reporting does not declare it.
      */
-    private static ObjectNode declaredArguments(JsonNode queue) {
-        ObjectNode arguments = ((ObjectNode) queue.get("arguments")).deepCopy();
+    private static ObjectNode declaredArguments(final JsonNode queue) {
+        final ObjectNode arguments = ((ObjectNode) queue.get("arguments")).deepCopy();
         if ("classic".equals(arguments.path(SERVER_DEFAULT_QUEUE_TYPE).asString())) {
             arguments.remove(SERVER_DEFAULT_QUEUE_TYPE);
         }
         return arguments;
     }
 
-    private static void assertExchange(JsonNode exchange, String type) {
+    private static void assertExchange(final JsonNode exchange, final String type) {
         assertThat(exchange.get("type").asString()).isEqualTo(type);
         assertThat(exchange.get("durable").asBoolean()).isTrue();
         assertThat(exchange.get("auto_delete").asBoolean()).isFalse();
@@ -122,8 +122,8 @@ class TopologyIT {
         assertThat(exchange.get("arguments").isEmpty()).isTrue();
     }
 
-    private static List<String> routingKeysTo(JsonNode bindings, String queue) {
-        List<String> keys = new ArrayList<>();
+    private static List<String> routingKeysTo(final JsonNode bindings, final String queue) {
+        final List<String> keys = new ArrayList<>();
         bindings.forEach(binding -> {
             if (queue.equals(binding.get("destination").asString())) {
                 keys.add(binding.get("routing_key").asString());

@@ -25,8 +25,8 @@ class RabbitConfigTest {
 
     @Test
     void declaresBothExchangesDurableAndNotAutoDeleted() {
-        TopicExchange events = config.eventsExchange();
-        DirectExchange deadLetters = config.deadLetterExchange();
+        final TopicExchange events = config.eventsExchange();
+        final DirectExchange deadLetters = config.deadLetterExchange();
 
         assertThat(events.getName()).isEqualTo(MessagingTopology.EVENTS_EXCHANGE);
         assertThat(events.getType()).isEqualTo(ExchangeTypes.TOPIC);
@@ -38,7 +38,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheWorkQueueWithExactlyTheDeadLetterArguments() {
-        Queue queue = config.filingSubmittedQueue();
+        final Queue queue = config.filingSubmittedQueue();
 
         assertThat(queue.getName()).isEqualTo("analysis.filing-submitted");
         assertThat(queue.isDurable()).isTrue();
@@ -51,7 +51,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheDeadLetterQueueWithoutArguments() {
-        Queue dlq = config.filingSubmittedDeadLetterQueue();
+        final Queue dlq = config.filingSubmittedDeadLetterQueue();
 
         assertThat(dlq.getName()).isEqualTo("analysis.filing-submitted.dlq");
         assertThat(dlq.isDurable()).isTrue();
@@ -60,8 +60,8 @@ class RabbitConfigTest {
 
     @Test
     void bindsTheQueuesWithTheDocumentedKeys() {
-        Binding work = config.filingSubmittedBinding(config.filingSubmittedQueue(), config.eventsExchange());
-        Binding deadLetter = config.filingSubmittedDeadLetterBinding(
+        final Binding work = config.filingSubmittedBinding(config.filingSubmittedQueue(), config.eventsExchange());
+        final Binding deadLetter = config.filingSubmittedDeadLetterBinding(
                 config.filingSubmittedDeadLetterQueue(), config.deadLetterExchange());
 
         assertThat(work.getExchange()).isEqualTo("veritrade.events");
@@ -74,10 +74,10 @@ class RabbitConfigTest {
 
     @Test
     void retriesProcessingFailuresButNotInvalidMessages() {
-        RetryPolicySettings settings = new RetryPolicySettings();
+        final RetryPolicySettings settings = new RetryPolicySettings();
         config.skipRetryForInvalidMessages().customize(settings);
-        Predicate<Throwable> retryable = settings.getExceptionPredicate();
-        Message message = new Message(new byte[0]);
+        final Predicate<Throwable> retryable = settings.getExceptionPredicate();
+        final Message message = new Message(new byte[0]);
 
         assertThat(retryable.test(new ListenerExecutionFailedException("x",
                 new InvalidFilingMessageException("bad"), message))).isFalse();
@@ -88,7 +88,7 @@ class RabbitConfigTest {
 
     @Test
     void putsTheJsonConverterOnTheTemplateOnly() {
-        RabbitTemplate template = new RabbitTemplate();
+        final RabbitTemplate template = new RabbitTemplate();
 
         config.jsonTemplateConverter(JsonMapper.builder().build()).customize(template);
 

@@ -22,15 +22,15 @@ public final class Contracts {
     }
 
     /** Asserts that a REST body matches a component schema of rest-api.openapi.yaml. */
-    public static void assertMatchesApiSchema(String component, JsonNode body) {
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(OPENAPI_SCHEMAS + component));
+    public static void assertMatchesApiSchema(final String component, final JsonNode body) {
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(OPENAPI_SCHEMAS + component));
         assertThat(schema.validate(body)).as("%s against %s", body, component).isEmpty();
     }
 
     /** Asserts that an event matches the JSON Schema of its type (which includes the envelope schema). */
-    public static void assertValidEvent(EventType type, JsonNode event) {
-        String stem = type.name().toLowerCase().replace('_', '-');
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + stem + ".schema.json"));
+    public static void assertValidEvent(final EventType type, final JsonNode event) {
+        final String stem = type.name().toLowerCase().replace('_', '-');
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + stem + ".schema.json"));
         assertThat(schema.validate(event)).as("%s against %s", event, stem).isEmpty();
     }
 }

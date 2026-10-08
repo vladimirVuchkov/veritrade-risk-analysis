@@ -70,14 +70,14 @@ class FilingStatusSqlTest {
         entityManager.flush();
         entityManager.clear();
 
-        Filing stored = filings.findById(filingId).orElseThrow();
+        final Filing stored = filings.findById(filingId).orElseThrow();
         assertThat(stored.status()).isEqualTo(FilingStatus.FAILED);
         assertThat(stored.failureReason()).isEqualTo("rule engine error");
         assertThat(stored.content()).hasSize(TestProperties.MAX_CONTENT_BYTES);
         assertThat(filings.findStateById(filingId).orElseThrow().version()).isEqualTo(2L);
     }
 
-    private StatusUpdate update(FilingStatus target, String reason) {
+    private StatusUpdate update(final FilingStatus target, final String reason) {
         return new StatusUpdate(UUID.randomUUID(), filingId, target, reason);
     }
 }

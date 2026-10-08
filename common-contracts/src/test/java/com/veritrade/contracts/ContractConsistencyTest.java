@@ -25,8 +25,8 @@ class ContractConsistencyTest {
 
     @Test
     void enumsMatchTheSchemaDefinitions() {
-        JsonNode envelope = readSchema("event-envelope.schema.json");
-        JsonNode defs = envelope.get("$defs");
+        final JsonNode envelope = readSchema("event-envelope.schema.json");
+        final JsonNode defs = envelope.get("$defs");
 
         assertThat(enumValues(envelope.get("properties").get("eventType"))).isEqualTo(names(EventType.values()));
         assertThat(enumValues(defs.get("riskCategory"))).isEqualTo(names(RiskCategory.values()));
@@ -36,7 +36,7 @@ class ContractConsistencyTest {
 
     @Test
     void routingKeysResolveToTheirEventTypes() {
-        for (EventType type : EventType.values()) {
+        for (final EventType type : EventType.values()) {
             assertThat(EventType.fromRoutingKey(type.routingKey())).isEqualTo(type);
         }
         assertThat(EventType.ANALYSIS_STARTED.routingKey()).isEqualTo(MessagingTopology.RK_ANALYSIS_STARTED);
@@ -44,7 +44,7 @@ class ContractConsistencyTest {
 
     @Test
     void analysisWildcardMatchesEveryAnalysisEvent() {
-        String prefix = MessagingTopology.RK_ANALYSIS_ALL.replace("*", "");
+        final String prefix = MessagingTopology.RK_ANALYSIS_ALL.replace("*", "");
 
         assertThat(Arrays.stream(EventType.values()).filter(t -> t.routingKey().startsWith(prefix)))
                 .containsExactly(EventType.ANALYSIS_STARTED, EventType.ANALYSIS_COMPLETED, EventType.ANALYSIS_FAILED);
@@ -58,26 +58,26 @@ class ContractConsistencyTest {
 
     @Test
     void eventIdsAreDeterministicAndDistinctPerEventType() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
 
         assertThat(EventIds.forFiling(filingId, EventType.ANALYSIS_COMPLETED))
                 .isEqualTo(EventIds.forFiling(filingId, EventType.ANALYSIS_COMPLETED))
                 .isNotEqualTo(EventIds.forFiling(filingId, EventType.ANALYSIS_FAILED));
     }
 
-    private static JsonNode readSchema(String file) {
+    private static JsonNode readSchema(final String file) {
         try (InputStream in = ContractExamplesTest.resource("contracts/" + file)) {
             return MAPPER.readTree(in);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private static List<String> enumValues(JsonNode node) {
+    private static List<String> enumValues(final JsonNode node) {
         return node.get("enum").valueStream().map(JsonNode::asString).toList();
     }
 
-    private static List<String> names(Enum<?>[] values) {
+    private static List<String> names(final Enum<?>[] values) {
         return Arrays.stream(values).map(Enum::name).toList();
     }
 }

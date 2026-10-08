@@ -62,9 +62,9 @@ class AnalysisEventPublisherTest {
     }
 
     static Stream<EventEnvelope<?>> allEvents() {
-        UUID filingId = UUID.randomUUID();
-        AnalysisEventFactory factory = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING);
-        AnalysisResult result = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
+        final UUID filingId = UUID.randomUUID();
+        final AnalysisEventFactory factory = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING);
+        final AnalysisResult result = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
         return Stream.of(
                 factory.started(filingId, CORRELATION_ID),
                 factory.completed(filingId, CORRELATION_ID, result),
@@ -73,16 +73,16 @@ class AnalysisEventPublisherTest {
 
     @ParameterizedTest
     @MethodSource("allEvents")
-    void sendsTheEventWithTheContractPropertiesToItsRoutingKey(EventEnvelope<?> event) {
+    void sendsTheEventWithTheContractPropertiesToItsRoutingKey(final EventEnvelope<?> event) {
         confirmWith(correlation -> correlation.getFuture().complete(new CorrelationData.Confirm(true, null)));
 
         publisher.publish(event);
 
-        ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
-        ArgumentCaptor<CorrelationData> correlation = ArgumentCaptor.forClass(CorrelationData.class);
+        final ArgumentCaptor<Message> sent = ArgumentCaptor.forClass(Message.class);
+        final ArgumentCaptor<CorrelationData> correlation = ArgumentCaptor.forClass(CorrelationData.class);
         verify(rabbitTemplate).send(eq(MessagingTopology.EVENTS_EXCHANGE), eq(event.eventType().routingKey()),
                 sent.capture(), correlation.capture());
-        MessageProperties properties = sent.getValue().getMessageProperties();
+        final MessageProperties properties = sent.getValue().getMessageProperties();
         assertThat(properties.getMessageId()).isEqualTo(event.eventId().toString());
         assertThat(properties.getContentType()).isEqualTo(MessageProperties.CONTENT_TYPE_JSON);
         assertThat(properties.getCorrelationId()).isEqualTo(CORRELATION_ID);
@@ -141,7 +141,7 @@ class AnalysisEventPublisherTest {
         return events.started(UUID.randomUUID(), CORRELATION_ID);
     }
 
-    private void confirmWith(Consumer<CorrelationData> broker) {
+    private void confirmWith(final Consumer<CorrelationData> broker) {
         doAnswer(invocation -> {
             broker.accept(invocation.getArgument(3));
             return null;

@@ -20,13 +20,13 @@ class HardWrappedFilingE2E extends E2ETestBase {
 
     @Test
     void hardWrappedSampleGivesTheSameRisksAsTheUnwrappedSample() {
-        FilingRequest unwrapped = system.demoFiling().withTitle("Unwrapped " + UUID.randomUUID());
-        FilingRequest wrapped = unwrapped.withTitle("Wrapped " + UUID.randomUUID())
+        final FilingRequest unwrapped = system.demoFiling().withTitle("Unwrapped " + UUID.randomUUID());
+        final FilingRequest wrapped = unwrapped.withTitle("Wrapped " + UUID.randomUUID())
                 .withContent(wrap(unwrapped.content(), WRAP_COLUMNS));
         assertThat(wrapped.content()).isNotEqualTo(unwrapped.content());
 
-        JsonNode expected = api.awaitReport(api.submitAccepted(unwrapped));
-        JsonNode actual = api.awaitReport(api.submitAccepted(wrapped));
+        final JsonNode expected = api.awaitReport(api.submitAccepted(unwrapped));
+        final JsonNode actual = api.awaitReport(api.submitAccepted(wrapped));
 
         ReportAssertions.assertConsistentCompletedReport(actual, wrapped.content());
         assertThat(ruleIds(actual)).containsExactlyInAnyOrderElementsOf(ruleIds(expected));
@@ -35,16 +35,16 @@ class HardWrappedFilingE2E extends E2ETestBase {
                 .anySatisfy(finding -> assertThat(finding.path("matchedText").asString()).contains("\n"));
     }
 
-    private static List<String> ruleIds(JsonNode report) {
+    private static List<String> ruleIds(final JsonNode report) {
         return ReportAssertions.findings(report).stream().map(finding -> finding.path("ruleId").asString()).toList();
     }
 
     /** Greedy word wrap of every line, like a plain-text EDGAR filing. */
-    private static String wrap(String text, int columns) {
-        StringBuilder out = new StringBuilder();
-        for (String line : text.split("\n", -1)) {
+    private static String wrap(final String text, final int columns) {
+        final StringBuilder out = new StringBuilder();
+        for (final String line : text.split("\n", -1)) {
             int lineLength = 0;
-            for (String word : line.split(" ")) {
+            for (final String word : line.split(" ")) {
                 if (lineLength > 0 && lineLength + 1 + word.length() > columns) {
                     out.append('\n');
                     lineLength = 0;

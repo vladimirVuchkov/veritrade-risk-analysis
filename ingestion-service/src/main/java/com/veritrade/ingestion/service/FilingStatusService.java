@@ -25,7 +25,7 @@ public class FilingStatusService {
     private final FilingRepository filings;
     private final Clock clock;
 
-    public FilingStatusService(FilingRepository filings, Clock clock) {
+    public FilingStatusService(final FilingRepository filings, final Clock clock) {
         this.filings = filings;
         this.clock = clock;
     }
@@ -36,10 +36,10 @@ public class FilingStatusService {
      * Neither the read nor the write loads the filing content.
      */
     @Transactional
-    public StatusChange apply(StatusUpdate update) {
-        FilingState state = filings.findStateById(update.filingId())
+    public StatusChange apply(final StatusUpdate update) {
+        final FilingState state = filings.findStateById(update.filingId())
                 .orElseThrow(() -> new FilingNotFoundException(update.filingId()));
-        StatusChange change = state.status().transitionTo(update.target());
+        final StatusChange change = state.status().transitionTo(update.target());
         if (change == StatusChange.APPLIED) {
             store(state, update);
         }
@@ -47,8 +47,8 @@ public class FilingStatusService {
         return change;
     }
 
-    private void store(FilingState state, StatusUpdate update) {
-        int changed = filings.changeStatus(state.id(), state.version(), update.target(),
+    private void store(final FilingState state, final StatusUpdate update) {
+        final int changed = filings.changeStatus(state.id(), state.version(), update.target(),
                 update.target().failureReasonToKeep(update.failureReason()),
                 clock.instant().truncatedTo(ChronoUnit.MICROS));
         if (changed == 0) {
@@ -56,7 +56,7 @@ public class FilingStatusService {
         }
     }
 
-    private static void logChange(StatusChange change, StatusUpdate update, FilingStatus before) {
+    private static void logChange(final StatusChange change, final StatusUpdate update, final FilingStatus before) {
         switch (change) {
             case APPLIED -> log.info("Filing {} moved from {} to {} by event {}",
                     update.filingId(), before, update.target(), update.eventId());

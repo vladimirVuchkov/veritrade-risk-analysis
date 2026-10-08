@@ -23,32 +23,32 @@ public class FilingSubmittedReader {
 
     private final ObjectReader reader;
 
-    public FilingSubmittedReader(JsonMapper jsonMapper) {
+    public FilingSubmittedReader(final JsonMapper jsonMapper) {
         this.reader = jsonMapper
                 .readerFor(jsonMapper.getTypeFactory()
                         .constructParametricType(EventEnvelope.class, FilingSubmittedPayload.class))
                 .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
-    public EventEnvelope<FilingSubmittedPayload> read(Message message) {
-        EventEnvelope<FilingSubmittedPayload> event = parse(message.getBody());
+    public EventEnvelope<FilingSubmittedPayload> read(final Message message) {
+        final EventEnvelope<FilingSubmittedPayload> event = parse(message.getBody());
         validate(event);
         return event;
     }
 
-    private EventEnvelope<FilingSubmittedPayload> parse(byte[] body) {
+    private EventEnvelope<FilingSubmittedPayload> parse(final byte[] body) {
         try {
-            EventEnvelope<FilingSubmittedPayload> event = reader.readValue(body);
+            final EventEnvelope<FilingSubmittedPayload> event = reader.readValue(body);
             if (event == null) {
                 throw new InvalidFilingMessageException("The message body is empty or null");
             }
             return event;
-        } catch (JacksonException e) {
+        } catch (final JacksonException e) {
             throw new InvalidFilingMessageException("Unreadable message body: " + e.getOriginalMessage(), e);
         }
     }
 
-    private static void validate(EventEnvelope<FilingSubmittedPayload> event) {
+    private static void validate(final EventEnvelope<FilingSubmittedPayload> event) {
         if (event.eventType() != EventType.FILING_SUBMITTED) {
             throw new InvalidFilingMessageException("Unexpected eventType " + event.eventType()
                     + " on the filing.submitted queue (event " + event.eventId() + ")");
@@ -58,16 +58,16 @@ public class FilingSubmittedReader {
                     + " of event " + event.eventId() + "; this service supports up to "
                     + EventEnvelope.CURRENT_VERSION + ", so the message waits in the dead-letter queue for a replay");
         }
-        List<String> missing = missingFields(event);
+        final List<String> missing = missingFields(event);
         if (!missing.isEmpty()) {
             throw new InvalidFilingMessageException(
                     "Missing or empty fields " + missing + " in event " + event.eventId());
         }
     }
 
-    private static List<String> missingFields(EventEnvelope<FilingSubmittedPayload> event) {
-        FilingSubmittedPayload payload = event.payload();
-        List<String> missing = new ArrayList<>();
+    private static List<String> missingFields(final EventEnvelope<FilingSubmittedPayload> event) {
+        final FilingSubmittedPayload payload = event.payload();
+        final List<String> missing = new ArrayList<>();
         addIf(missing, event.correlationId().isBlank(), "correlationId");
         addIf(missing, payload.filingId() == null, "payload.filingId");
         addIf(missing, isBlank(payload.companyName()), "payload.companyName");
@@ -77,13 +77,13 @@ public class FilingSubmittedReader {
         return missing;
     }
 
-    private static void addIf(List<String> missing, boolean condition, String field) {
+    private static void addIf(final List<String> missing, final boolean condition, final String field) {
         if (condition) {
             missing.add(field);
         }
     }
 
-    private static boolean isBlank(String value) {
+    private static boolean isBlank(final String value) {
         return value == null || value.isBlank();
     }
 }

@@ -4,11 +4,11 @@ import java.util.UUID;
 
 public class ReportNotFoundException extends RuntimeException {
 
-    private ReportNotFoundException(String message) {
+    private ReportNotFoundException(final String message) {
         super(message);
     }
 
-    static ReportNotFoundException notReady(UUID filingId) {
+    static ReportNotFoundException notReady(final UUID filingId) {
         return new ReportNotFoundException("No report for filing " + filingId + " yet");
     }
 

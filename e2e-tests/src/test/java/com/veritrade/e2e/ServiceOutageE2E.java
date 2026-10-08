@@ -37,8 +37,8 @@ class ServiceOutageE2E extends E2ETestBase {
     @Test
     void filingStaysSubmittedWhileAnalysisIsDownAndCompletesAfterItRestarts() {
         stack.stop(ComposeStack.ANALYSIS);
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = api.submitAccepted(filing);
 
         assertStaysSubmittedWithoutReport(filingId);
         awaitQueueDepthAtLeast(Q_ANALYSIS_FILING_SUBMITTED, 1);
@@ -50,13 +50,13 @@ class ServiceOutageE2E extends E2ETestBase {
 
     @Test
     void reportIsUnavailableWhileReportingIsDownAndAppearsAfterItRestarts() {
-        UUID unknownReport = UUID.randomUUID();
+        final UUID unknownReport = UUID.randomUUID();
         stopAndAssertFastServiceUnavailable(ComposeStack.REPORTING, () -> api.report(unknownReport));
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = api.submitAccepted(filing);
 
         api.awaitStatus(filingId, "COMPLETED");
-        ApiResponse report = api.report(filingId);
+        final ApiResponse report = api.report(filingId);
         assertThat(report.isProblem(SERVICE_UNAVAILABLE)).as(report.toString()).isTrue();
         awaitQueueDepthAtLeast(Q_REPORTING_ANALYSIS_RESULTS, 1);
         stack.start(ComposeStack.REPORTING);
@@ -67,8 +67,8 @@ class ServiceOutageE2E extends E2ETestBase {
     @Test
     void analysisEventsWaitWhileIngestionIsDownAndTheStatusCatchesUpAfterItRestarts() {
         stack.stop(ComposeStack.ANALYSIS);
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = api.submitAccepted(filing);
         system.awaitLogLine(ComposeStack.INGESTION, "Published event " + submittedEventId(filingId));
         stopAndAssertFastServiceUnavailable(ComposeStack.INGESTION, () -> api.filing(filingId));
         stack.start(ComposeStack.ANALYSIS);
@@ -83,9 +83,9 @@ class ServiceOutageE2E extends E2ETestBase {
     @Test
     void outboxKeepsTheEventWhileTheBrokerIsDownAndTheFilingCompletesAfterTheBrokerRestarts() {
         stack.stop(ComposeStack.RABBITMQ);
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = api.submitAccepted(filing);
-        String eventId = submittedEventId(filingId).toString();
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = api.submitAccepted(filing);
+        final String eventId = submittedEventId(filingId).toString();
 
         assertStaysSubmittedWithoutReport(filingId);
         assertThat(system.countLogLines(ComposeStack.INGESTION, "Published event " + eventId)).isZero();
@@ -99,8 +99,8 @@ class ServiceOutageE2E extends E2ETestBase {
     @Test
     void unpublishedOutboxEventSurvivesAnIngestionRestartWhileTheBrokerIsDown() {
         stack.stop(ComposeStack.RABBITMQ);
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = api.submitAccepted(filing);
         assertStaysSubmittedWithoutReport(filingId);
         assertThat(system.countLogLines(ComposeStack.INGESTION, "Published event " + submittedEventId(filingId))).isZero();
 
@@ -116,7 +116,7 @@ class ServiceOutageE2E extends E2ETestBase {
         ReportAssertions.assertConsistentCompletedReport(api.awaitReport(filingId), filing.content());
     }
 
-    private static void assertStaysSubmittedWithoutReport(UUID filingId) {
+    private static void assertStaysSubmittedWithoutReport(final UUID filingId) {
         await("filing " + filingId + " untouched").during(Timeouts.HOLD).atMost(Timeouts.HOLD.multipliedBy(2))
                 .pollInterval(Timeouts.POLL_INTERVAL)
                 .until(() -> api.status(filingId).equals("SUBMITTED") && api.report(filingId).status() == NOT_FOUND);
@@ -128,13 +128,13 @@ class ServiceOutageE2E extends E2ETestBase {
      * still holds that address, arrives within {@link Timeouts#UPSTREAM_UNAVAILABLE} (nginx's connect
      * timeout is 2 s), and every request sent after the stop is a 503 problem+json. No retry.
      */
-    private static void stopAndAssertFastServiceUnavailable(String service, Supplier<ApiResponse> request) {
+    private static void stopAndAssertFastServiceUnavailable(final String service, final Supplier<ApiResponse> request) {
         List<UpstreamProbe.Result> results;
         long stoppedAt;
         try (UpstreamProbe probe = UpstreamProbe.start(request)) {
             stack.stop(service);
             stoppedAt = System.nanoTime();
-            long cacheExpired = stoppedAt + Timeouts.UPSTREAM_ADDRESS_CACHE.toNanos();
+            final long cacheExpired = stoppedAt + Timeouts.UPSTREAM_ADDRESS_CACHE.toNanos();
             await("probes beyond nginx's cached upstream address")
                     .atMost(Timeouts.UPSTREAM_ADDRESS_CACHE.plus(Timeouts.HTTP_REQUEST))
                     .pollInterval(Timeouts.POLL_INTERVAL)
@@ -151,13 +151,13 @@ class ServiceOutageE2E extends E2ETestBase {
                 .allSatisfy(result -> assertThat(result.isProblem(SERVICE_UNAVAILABLE)).as(result.toString()).isTrue());
     }
 
-    private static void awaitQueueDepthAtLeast(String queue, int messages) {
+    private static void awaitQueueDepthAtLeast(final String queue, final int messages) {
         await(queue + " holds " + messages + " message(s)").atMost(Timeouts.QUEUE_STATISTICS)
                 .pollInterval(Timeouts.POLL_INTERVAL)
                 .until(() -> broker.messageCount(queue) >= messages);
     }
 
-    private static UUID submittedEventId(UUID filingId) {
+    private static UUID submittedEventId(final UUID filingId) {
         return EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
     }
 }

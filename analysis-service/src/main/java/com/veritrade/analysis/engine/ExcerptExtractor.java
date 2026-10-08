@@ -13,7 +13,7 @@ public final class ExcerptExtractor {
     private final int contextChars;
     private final int maxExcerptChars;
 
-    public ExcerptExtractor(int contextChars, int maxExcerptChars) {
+    public ExcerptExtractor(final int contextChars, final int maxExcerptChars) {
         if (contextChars < 0) {
             throw new IllegalArgumentException("contextChars must be >= 0, was " + contextChars);
         }
@@ -25,15 +25,15 @@ public final class ExcerptExtractor {
     }
 
     /** The excerpt; requires a match no longer than {@code maxExcerptChars}. */
-    public String extract(String text, Match match) {
-        int matchLength = match.end() - match.start();
+    public String extract(final String text, final Match match) {
+        final int matchLength = match.end() - match.start();
         if (matchLength > maxExcerptChars) {
             throw new IllegalArgumentException("A match of " + matchLength
                     + " characters does not fit into an excerpt of " + maxExcerptChars);
         }
-        int context = Math.max(0, Math.min(contextChars, (maxExcerptChars - matchLength) / 2 - SURROGATE_ALLOWANCE));
-        int from = TextBounds.safeStart(text, Math.max(0, match.start() - context));
-        int to = TextBounds.safeEnd(text, match.end() + Math.min(context, text.length() - match.end()));
+        final int context = Math.max(0, Math.min(contextChars, (maxExcerptChars - matchLength) / 2 - SURROGATE_ALLOWANCE));
+        final int from = TextBounds.safeStart(text, Math.max(0, match.start() - context));
+        final int to = TextBounds.safeEnd(text, match.end() + Math.min(context, text.length() - match.end()));
         return text.substring(from, to);
     }
 }

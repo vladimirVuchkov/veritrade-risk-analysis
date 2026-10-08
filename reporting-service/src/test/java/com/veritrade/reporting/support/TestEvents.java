@@ -45,54 +45,54 @@ public final class TestEvents {
     private TestEvents() {
     }
 
-    public static FindingPayload finding(RiskCategory category, Severity severity, int position) {
+    public static FindingPayload finding(final RiskCategory category, final Severity severity, final int position) {
         return new FindingPayload(category, severity, "LEGAL-001", "pending litigation",
                 "We are subject to pending litigation.", position);
     }
 
-    public static AnalysisCompletedPayload completed(UUID filingId, RiskLevel level, List<FindingPayload> findings) {
-        Map<RiskCategory, Integer> byCategory = new EnumMap<>(RiskCategory.class);
+    public static AnalysisCompletedPayload completed(final UUID filingId, final RiskLevel level, final List<FindingPayload> findings) {
+        final Map<RiskCategory, Integer> byCategory = new EnumMap<>(RiskCategory.class);
         findings.forEach(f -> byCategory.merge(f.category(), 1, Integer::sum));
         return new AnalysisCompletedPayload(
                 filingId, AT, "1.0", new AnalysisSummary(findings.size(), level, byCategory), findings);
     }
 
-    public static AnalysisFailedPayload failed(UUID filingId, String reason) {
+    public static AnalysisFailedPayload failed(final UUID filingId, final String reason) {
         return new AnalysisFailedPayload(filingId, AT, reason);
     }
 
-    public static EventEnvelope<AnalysisCompletedPayload> completedEnvelope(AnalysisCompletedPayload payload) {
+    public static EventEnvelope<AnalysisCompletedPayload> completedEnvelope(final AnalysisCompletedPayload payload) {
         return EventEnvelope.of(EventIds.forFiling(payload.filingId(), EventType.ANALYSIS_COMPLETED),
                 EventType.ANALYSIS_COMPLETED, AT, CORRELATION_ID, payload);
     }
 
-    public static EventEnvelope<AnalysisFailedPayload> failedEnvelope(AnalysisFailedPayload payload) {
+    public static EventEnvelope<AnalysisFailedPayload> failedEnvelope(final AnalysisFailedPayload payload) {
         return EventEnvelope.of(EventIds.forFiling(payload.filingId(), EventType.ANALYSIS_FAILED),
                 EventType.ANALYSIS_FAILED, AT, CORRELATION_ID, payload);
     }
 
-    public static ObjectNode tree(EventEnvelope<?> envelope) {
+    public static ObjectNode tree(final EventEnvelope<?> envelope) {
         return MAPPER.valueToTree(envelope);
     }
 
-    public static ObjectNode example(String path) {
+    public static ObjectNode example(final String path) {
         try (InputStream in = TestEvents.class.getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("Missing test resource: " + path);
             }
             return (ObjectNode) MAPPER.readTree(in);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public static Message message(Object body, String routingKey) {
-        String json = body instanceof String text ? text : MAPPER.writeValueAsString(body);
+    public static Message message(final Object body, final String routingKey) {
+        final String json = body instanceof String text ? text : MAPPER.writeValueAsString(body);
         return message(json.getBytes(StandardCharsets.UTF_8), routingKey);
     }
 
-    public static Message message(byte[] body, String routingKey) {
-        MessageProperties properties = new MessageProperties();
+    public static Message message(final byte[] body, final String routingKey) {
+        final MessageProperties properties = new MessageProperties();
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         properties.setReceivedRoutingKey(routingKey);
         properties.setCorrelationId(CORRELATION_ID);
@@ -100,7 +100,7 @@ public final class TestEvents {
     }
 
     /** A string of the given number of code points, each a supplementary character (two UTF-16 units). */
-    public static String emoji(int codePoints) {
+    public static String emoji(final int codePoints) {
         return "😀".repeat(codePoints);
     }
 }

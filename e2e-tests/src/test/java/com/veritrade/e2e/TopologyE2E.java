@@ -47,8 +47,8 @@ class TopologyE2E extends E2ETestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {Q_ANALYSIS_FILING_SUBMITTED, Q_INGESTION_ANALYSIS_EVENTS, Q_REPORTING_ANALYSIS_RESULTS})
-    void workQueueHasExactlyTheDeadLetterArguments(String queue) {
-        JsonNode declared = broker.queue(queue);
+    void workQueueHasExactlyTheDeadLetterArguments(final String queue) {
+        final JsonNode declared = broker.queue(queue);
 
         assertDurableClassicQueue(declared);
         assertThat(arguments(declared)).isEqualTo(Map.of(
@@ -58,8 +58,8 @@ class TopologyE2E extends E2ETestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {Q_ANALYSIS_FILING_SUBMITTED, Q_INGESTION_ANALYSIS_EVENTS, Q_REPORTING_ANALYSIS_RESULTS})
-    void deadLetterQueueHasNoArgumentsAndNoConsumer(String workQueue) {
-        JsonNode declared = broker.queue(deadLetterQueue(workQueue));
+    void deadLetterQueueHasNoArgumentsAndNoConsumer(final String workQueue) {
+        final JsonNode declared = broker.queue(deadLetterQueue(workQueue));
 
         assertDurableClassicQueue(declared);
         assertThat(arguments(declared)).isEmpty();
@@ -84,7 +84,7 @@ class TopologyE2E extends E2ETestBase {
 
     @Test
     void noOtherQueuesExist() {
-        Set<String> expected = WORK_QUEUES.stream()
+        final Set<String> expected = WORK_QUEUES.stream()
                 .flatMap(queue -> Stream.of(queue, deadLetterQueue(queue)))
                 .collect(Collectors.toSet());
 
@@ -94,7 +94,7 @@ class TopologyE2E extends E2ETestBase {
 
     @Test
     void everyWorkQueueHasAConsumerWithPrefetchTen() {
-        Map<String, List<Integer>> prefetchByQueue = await("consumers of every work queue")
+        final Map<String, List<Integer>> prefetchByQueue = await("consumers of every work queue")
                 .atMost(Timeouts.QUEUE_STATISTICS).pollInterval(Timeouts.POLL_INTERVAL)
                 .until(TopologyE2E::prefetchByQueue, consumers -> consumers.keySet().containsAll(WORK_QUEUES));
 
@@ -108,8 +108,8 @@ class TopologyE2E extends E2ETestBase {
                         Collectors.mapping(consumer -> consumer.path("prefetch_count").asInt(), Collectors.toList())));
     }
 
-    private static void assertExchange(String name, String type) {
-        JsonNode exchange = broker.exchange(name);
+    private static void assertExchange(final String name, final String type) {
+        final JsonNode exchange = broker.exchange(name);
         assertThat(exchange.path("type").asString()).isEqualTo(type);
         assertThat(exchange.path("durable").asBoolean()).isTrue();
         assertThat(exchange.path("auto_delete").asBoolean()).isFalse();
@@ -117,7 +117,7 @@ class TopologyE2E extends E2ETestBase {
         assertThat(exchange.path("arguments").isEmpty()).isTrue();
     }
 
-    private static void assertDurableClassicQueue(JsonNode queue) {
+    private static void assertDurableClassicQueue(final JsonNode queue) {
         assertThat(queue.path("durable").asBoolean()).isTrue();
         assertThat(queue.path("auto_delete").asBoolean()).isFalse();
         assertThat(queue.path("exclusive").asBoolean()).isFalse();
@@ -125,15 +125,15 @@ class TopologyE2E extends E2ETestBase {
     }
 
     /** Declared arguments, without the queue type that the server adds by itself. */
-    private static Map<String, String> arguments(JsonNode queue) {
-        Map<String, String> arguments = new TreeMap<>();
+    private static Map<String, String> arguments(final JsonNode queue) {
+        final Map<String, String> arguments = new TreeMap<>();
         queue.path("arguments").properties().forEach(entry -> arguments.put(entry.getKey(), entry.getValue().asString()));
         assertThat(arguments.getOrDefault(SERVER_ADDED_QUEUE_TYPE, CLASSIC)).isEqualTo(CLASSIC);
         arguments.remove(SERVER_ADDED_QUEUE_TYPE);
         return arguments;
     }
 
-    private static Set<String> bindings(String exchange) {
+    private static Set<String> bindings(final String exchange) {
         return StreamSupport.stream(broker.bindingsFrom(exchange).spliterator(), false)
                 .map(binding -> binding.path("destination").asString() + " <- " + binding.path("routing_key").asString())
                 .collect(Collectors.toSet());

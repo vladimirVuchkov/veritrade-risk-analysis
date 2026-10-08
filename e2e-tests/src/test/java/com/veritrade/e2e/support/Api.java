@@ -35,7 +35,7 @@ public final class Api {
     private final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1).connectTimeout(Timeouts.HTTP_REQUEST).build();
 
-    public Api(Supplier<URI> endpointLookup) {
+    public Api(final Supplier<URI> endpointLookup) {
         this.endpointLookup = endpointLookup;
         this.baseUri = endpointLookup.get();
     }
@@ -46,27 +46,27 @@ public final class Api {
         return baseUri;
     }
 
-    public ApiResponse submit(FilingRequest filing) {
+    public ApiResponse submit(final FilingRequest filing) {
         return submit(filing.toJson(), Map.of());
     }
 
-    public ApiResponse submit(String json, Map<String, String> headers) {
+    public ApiResponse submit(final String json, final Map<String, String> headers) {
         return post(FILINGS, BodyPublishers.ofString(json), JSON, headers);
     }
 
     /** Submits a filing that must be accepted and returns its id. */
-    public UUID submitAccepted(FilingRequest filing) {
+    public UUID submitAccepted(final FilingRequest filing) {
         return submitAccepted(filing, Map.of());
     }
 
-    public UUID submitAccepted(FilingRequest filing, Map<String, String> headers) {
-        ApiResponse response = submit(filing.toJson(), headers);
+    public UUID submitAccepted(final FilingRequest filing, final Map<String, String> headers) {
+        final ApiResponse response = submit(filing.toJson(), headers);
         assertThat(response.status()).as("submit %s", response).isEqualTo(ACCEPTED);
         return UUID.fromString(response.json().path("filingId").asString());
     }
 
-    public ApiResponse post(String path, BodyPublisher body, String contentType, Map<String, String> headers) {
-        HttpRequest.Builder request = request(path).POST(body);
+    public ApiResponse post(final String path, final BodyPublisher body, final String contentType, final Map<String, String> headers) {
+        final HttpRequest.Builder request = request(path).POST(body);
         if (contentType != null) {
             request.header("Content-Type", contentType);
         }
@@ -74,29 +74,29 @@ public final class Api {
         return send(request.build());
     }
 
-    public ApiResponse get(String path) {
+    public ApiResponse get(final String path) {
         return send(request(path).GET().header("Accept", JSON).build());
     }
 
-    public ApiResponse filing(UUID filingId) {
+    public ApiResponse filing(final UUID filingId) {
         return get(FILINGS + "/" + filingId);
     }
 
-    public ApiResponse report(UUID filingId) {
+    public ApiResponse report(final UUID filingId) {
         return get(REPORTS + "/" + filingId);
     }
 
-    public String status(UUID filingId) {
-        ApiResponse response = filing(filingId);
+    public String status(final UUID filingId) {
+        final ApiResponse response = filing(filingId);
         return response.status() == OK ? response.json().path("status").asString() : "HTTP " + response.status();
     }
 
     /** Waits until the filing has the expected status; fails at once on a different final status. */
-    public JsonNode awaitStatus(UUID filingId, String expected) {
+    public JsonNode awaitStatus(final UUID filingId, final String expected) {
         return awaitStatus(filingId, expected, Timeouts.PROCESSING);
     }
 
-    public JsonNode awaitStatus(UUID filingId, String expected, Duration timeout) {
+    public JsonNode awaitStatus(final UUID filingId, final String expected, final Duration timeout) {
         await("filing " + filingId + " " + expected).atMost(timeout).pollInterval(Timeouts.POLL_INTERVAL)
                 .ignoreExceptionsInstanceOf(UncheckedIOException.class)
                 .until(() -> reachedOrFailFast(filingId, expected));
@@ -104,26 +104,26 @@ public final class Api {
     }
 
     /** Waits until the report answers 200 and returns it. */
-    public JsonNode awaitReport(UUID filingId) {
+    public JsonNode awaitReport(final UUID filingId) {
         return awaitReport(filingId, Timeouts.PROCESSING);
     }
 
-    public JsonNode awaitReport(UUID filingId, Duration timeout) {
+    public JsonNode awaitReport(final UUID filingId, final Duration timeout) {
         return await("report of " + filingId).atMost(timeout).pollInterval(Timeouts.POLL_INTERVAL)
                 .ignoreExceptionsInstanceOf(UncheckedIOException.class)
                 .until(() -> report(filingId), response -> response.status() == OK)
                 .json();
     }
 
-    private boolean reachedOrFailFast(UUID filingId, String expected) {
-        String actual = status(filingId);
+    private boolean reachedOrFailFast(final UUID filingId, final String expected) {
+        final String actual = status(filingId);
         if (FINAL_STATUSES.contains(actual) && !actual.equals(expected)) {
             throw new AssertionError("filing " + filingId + " is " + actual + ", expected " + expected);
         }
         return actual.equals(expected);
     }
 
-    private HttpRequest.Builder request(String path) {
+    private HttpRequest.Builder request(final String path) {
         return HttpRequest.newBuilder(baseUri.resolve(path)).timeout(Timeouts.HTTP_REQUEST);
     }
 
@@ -131,30 +131,30 @@ public final class Api {
      * A refused connection usually means nginx was restarted on a new host port: look it up and send the
      * request again. Nothing reached the server, so this is safe for a POST too.
      */
-    private ApiResponse send(HttpRequest request) {
+    private ApiResponse send(final HttpRequest request) {
         try {
             return sendOnce(request);
-        } catch (ConnectException firstFailure) {
-            URI uri = request.uri();
-            String pathAndQuery = uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
-            HttpRequest retry = HttpRequest.newBuilder(request, (name, value) -> true)
+        } catch (final ConnectException firstFailure) {
+            final URI uri = request.uri();
+            final String pathAndQuery = uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
+            final HttpRequest retry = HttpRequest.newBuilder(request, (name, value) -> true)
                     .uri(baseUri().resolve(pathAndQuery)).build();
             try {
                 return sendOnce(retry);
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 e.addSuppressed(firstFailure);
                 throw new UncheckedIOException(e);
             }
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private ApiResponse sendOnce(HttpRequest request) throws IOException {
+    private ApiResponse sendOnce(final HttpRequest request) throws IOException {
         try {
-            var response = client.send(request, BodyHandlers.ofString());
+            final var response = client.send(request, BodyHandlers.ofString());
             return new ApiResponse(response.statusCode(), response.headers(), response.body());
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }

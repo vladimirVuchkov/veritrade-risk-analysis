@@ -101,12 +101,12 @@ class OutboxPublishingIT {
     void submittedFilingReachesTheBrokerAsAValidEventWithTheContractProperties() throws Exception {
         bindTestQueue(QueueBuilder.durable("it.filing-submitted." + UUID.randomUUID()).build());
 
-        UUID filingId = submit("corr-it-1");
-        UUID eventId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
+        final UUID filingId = submit("corr-it-1");
+        final UUID eventId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
 
-        Message message = Broker.receiveMatching(rabbitTemplate, testQueue, Broker.withMessageId(eventId), WAIT);
+        final Message message = Broker.receiveMatching(rabbitTemplate, testQueue, Broker.withMessageId(eventId), WAIT);
         assertThat(message).isNotNull();
-        String body = new String(message.getBody(), StandardCharsets.UTF_8);
+        final String body = new String(message.getBody(), StandardCharsets.UTF_8);
         assertThat(Contracts.validate(EventType.FILING_SUBMITTED, body)).isEmpty();
         assertThat(Contracts.validateEnvelope(body)).isEmpty();
         assertThat(jsonMapper.readTree(body).get("payload").get("filingId").asString()).isEqualTo(filingId.toString());
@@ -120,8 +120,8 @@ class OutboxPublishingIT {
     }
 
     @Test
-    void unroutableEventStaysUnpublishedUntilAQueueIsBound(CapturedOutput output) throws Exception {
-        UUID eventId = EventIds.forFiling(submit("corr-it-2"), EventType.FILING_SUBMITTED);
+    void unroutableEventStaysUnpublishedUntilAQueueIsBound(final CapturedOutput output) throws Exception {
+        final UUID eventId = EventIds.forFiling(submit("corr-it-2"), EventType.FILING_SUBMITTED);
 
         assertStaysUnpublished(eventId);
         assertThat(output).contains("returned as unroutable");
@@ -134,12 +134,12 @@ class OutboxPublishingIT {
     }
 
     @Test
-    void negativelyConfirmedEventStaysUnpublishedAndIsSentAgainLater(CapturedOutput output) throws Exception {
-        String rejecting = "it.rejecting." + UUID.randomUUID();
+    void negativelyConfirmedEventStaysUnpublishedAndIsSentAgainLater(final CapturedOutput output) throws Exception {
+        final String rejecting = "it.rejecting." + UUID.randomUUID();
         bindTestQueue(QueueBuilder.durable(rejecting)
                 .withArguments(Map.of("x-max-length", 0, "x-overflow", "reject-publish")).build());
 
-        UUID eventId = EventIds.forFiling(submit("corr-it-3"), EventType.FILING_SUBMITTED);
+        final UUID eventId = EventIds.forFiling(submit("corr-it-3"), EventType.FILING_SUBMITTED);
 
         assertStaysUnpublished(eventId);
         assertThat(output).contains("negatively confirmed");
@@ -157,17 +157,17 @@ class OutboxPublishingIT {
     void correlationIdOverTheAmqpShortStringLimitIsReplacedAndTheFilingIsPublished() throws Exception {
         bindTestQueue(QueueBuilder.durable("it.poison-header." + UUID.randomUUID()).build());
 
-        var response = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
+        final var response = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
                         .header("X-Correlation-Id", POISON_CORRELATION_ID)
                         .content("{\"companyName\":\"Acme\",\"title\":\"10-K\",\"content\":\"pending litigation\"}"))
                 .andExpect(status().isAccepted())
                 .andReturn().getResponse();
-        String generated = response.getHeader("X-Correlation-Id");
-        UUID filingId = UUID.fromString(jsonMapper.readTree(response.getContentAsString()).get("filingId").asString());
-        UUID eventId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
+        final String generated = response.getHeader("X-Correlation-Id");
+        final UUID filingId = UUID.fromString(jsonMapper.readTree(response.getContentAsString()).get("filingId").asString());
+        final UUID eventId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
 
         assertThat(UUID.fromString(generated)).isNotNull();
-        Message message = Broker.receiveMatching(rabbitTemplate, testQueue, Broker.withMessageId(eventId), WAIT);
+        final Message message = Broker.receiveMatching(rabbitTemplate, testQueue, Broker.withMessageId(eventId), WAIT);
         assertThat(message).isNotNull();
         assertThat(message.getMessageProperties().getCorrelationId()).isEqualTo(generated);
         awaitPublished(eventId);
@@ -178,18 +178,18 @@ class OutboxPublishingIT {
      * max-attempts attempts; the filing behind it waits until then (order) and is published afterwards.
      */
     @Test
-    void rowThatCanNeverBePublishedIsParkedAfterExactlyMaxAttemptsAndLaterRowsArePublished(CapturedOutput output)
+    void rowThatCanNeverBePublishedIsParkedAfterExactlyMaxAttemptsAndLaterRowsArePublished(final CapturedOutput output)
             throws Exception {
         bindTestQueue(QueueBuilder.durable("it.after-poison." + UUID.randomUUID()).build());
-        UUID poisonId = UUID.randomUUID();
+        final UUID poisonId = UUID.randomUUID();
         outbox.save(new OutboxEvent(poisonId, "filing.submitted", POISON_CORRELATION_ID, "{}",
                 Instant.now().minusSeconds(60)));
 
-        UUID nextEventId = EventIds.forFiling(submit("corr-it-after-poison"), EventType.FILING_SUBMITTED);
+        final UUID nextEventId = EventIds.forFiling(submit("corr-it-after-poison"), EventType.FILING_SUBMITTED);
 
         assertThat(Broker.receiveMatching(rabbitTemplate, testQueue, Broker.withMessageId(nextEventId), WAIT)).isNotNull();
         awaitPublished(nextEventId);
-        Map<String, Object> poison = outboxColumns(poisonId);
+        final Map<String, Object> poison = outboxColumns(poisonId);
         assertThat(poison).containsEntry("ATTEMPTS", MAX_ATTEMPTS).containsEntry("PUBLISHED_AT", null);
         assertThat(poison.get("PARKED_AT")).isNotNull();
         assertThat((String) poison.get("LAST_ERROR")).contains("Short string too long");
@@ -203,7 +203,7 @@ class OutboxPublishingIT {
 
     /** A broker outage is transient: it parks nothing and the order is kept once the broker is back. */
     @Test
-    void brokerOutageParksNothingAndThePendingRowsArePublishedInOrderAfterwards(CapturedOutput output) throws Exception {
+    void brokerOutageParksNothingAndThePendingRowsArePublishedInOrderAfterwards(final CapturedOutput output) throws Exception {
         bindTestQueue(QueueBuilder.durable("it.outage." + UUID.randomUUID()).build());
         rabbitmqctl("stop_app");
         UUID first;
@@ -220,44 +220,44 @@ class OutboxPublishingIT {
             rabbitmqctl("start_app");
         }
 
-        Message firstMessage = Broker.receiveMatching(rabbitTemplate, testQueue, message -> true, WAIT);
-        Message secondMessage = Broker.receiveMatching(rabbitTemplate, testQueue, message -> true, WAIT);
+        final Message firstMessage = Broker.receiveMatching(rabbitTemplate, testQueue, message -> true, WAIT);
+        final Message secondMessage = Broker.receiveMatching(rabbitTemplate, testQueue, message -> true, WAIT);
         assertThat(firstMessage.getMessageProperties().getMessageId()).isEqualTo(first.toString());
         assertThat(secondMessage.getMessageProperties().getMessageId()).isEqualTo(second.toString());
         awaitPublished(second);
         assertThat(output).doesNotContain("parked after", "refused before reaching the broker");
     }
 
-    private Map<String, Object> outboxColumns(UUID eventId) {
+    private Map<String, Object> outboxColumns(final UUID eventId) {
         return jdbc.queryForMap("select attempts, last_error, parked_at, published_at from outbox where id = ?", eventId);
     }
 
-    private static void rabbitmqctl(String command) throws Exception {
+    private static void rabbitmqctl(final String command) throws Exception {
         assertThat(RABBIT.execInContainer("rabbitmqctl", command).getExitCode()).as("rabbitmqctl %s", command).isZero();
     }
 
-    private void assertStaysUnpublished(UUID eventId) {
+    private void assertStaysUnpublished(final UUID eventId) {
         await().during(SEVERAL_RUNS).atMost(SEVERAL_RUNS.plusSeconds(2))
                 .untilAsserted(() -> assertThat(row(eventId).publishedAt()).isNull());
     }
 
-    private void awaitPublished(UUID eventId) {
+    private void awaitPublished(final UUID eventId) {
         await().atMost(WAIT).untilAsserted(() -> assertThat(row(eventId).publishedAt()).isNotNull());
     }
 
-    private OutboxEvent row(UUID eventId) {
+    private OutboxEvent row(final UUID eventId) {
         return outbox.findById(eventId).orElseThrow();
     }
 
-    private void bindTestQueue(Queue queue) {
+    private void bindTestQueue(final Queue queue) {
         admin.declareQueue(queue);
         declaredQueues.add(queue.getName());
         admin.declareBinding(BindingBuilder.bind(queue).to(eventsExchange).with("filing.submitted"));
         testQueue = queue.getName();
     }
 
-    private UUID submit(String correlationId) throws Exception {
-        String response = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
+    private UUID submit(final String correlationId) throws Exception {
+        final String response = mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON)
                         .header("X-Correlation-Id", correlationId)
                         .content("{\"companyName\":\"Acme\",\"title\":\"10-K\",\"content\":\"pending litigation\"}"))
                 .andExpect(status().isAccepted())

@@ -46,10 +46,10 @@ class WhitespaceTolerantMatchingTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("separators")
     void matchesAPhraseBrokenByWhitespace(String name, String separator) {
-        String phrase = "substantial doubt about our ability to continue as a going" + separator + "concern";
-        String text = "These conditions raise " + phrase + ". Management plans are described in Note 2.";
+        final String phrase = "substantial doubt about our ability to continue as a going" + separator + "concern";
+        final String text = "These conditions raise " + phrase + ". Management plans are described in Note 2.";
 
-        Finding finding = singleFinding(text, "FIN-001");
+        final Finding finding = singleFinding(text, "FIN-001");
 
         assertThat(finding.matchedText()).isEqualTo(phrase);
         assertThat(finding.position()).isEqualTo(text.indexOf(phrase));
@@ -59,16 +59,16 @@ class WhitespaceTolerantMatchingTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("separators")
     void matchesWhenEverySpaceOfAPhraseIsReplaced(String name, String separator) {
-        String phrase = String.join(separator, "unauthorized", "access", "to", "customer", "data");
+        final String phrase = String.join(separator, "unauthorized", "access", "to", "customer", "data");
 
         assertThat(singleFinding(phrase, "CYBER-002").matchedText()).isEqualTo(phrase);
     }
 
     @Test
     void matchesAPhraseAtTheStartAndAtTheEndOfTheText() {
-        String text = "material\r\nweakness was found; we cannot rule out a data\n\tbreach";
+        final String text = "material\r\nweakness was found; we cannot rule out a data\n\tbreach";
 
-        List<Finding> findings = analyzer.analyze(text).findings();
+        final List<Finding> findings = analyzer.analyze(text).findings();
 
         assertThat(findings).extracting(Finding::ruleId, Finding::position, Finding::matchedText).containsExactly(
                 tuple("FIN-002", 0, "material\r\nweakness"),
@@ -78,7 +78,7 @@ class WhitespaceTolerantMatchingTest {
 
     @Test
     void matchesTheFormerCharacterClassAlternativesAcrossLineBreaks() {
-        String text = "We rely on sole\nsource suppliers. A denial-of\nservice attack and a cyber\r\nattack hit us.";
+        final String text = "We rely on sole\nsource suppliers. A denial-of\nservice attack and a cyber\r\nattack hit us.";
 
         assertThat(analyzer.analyze(text).findings()).extracting(Finding::ruleId)
                 .containsExactly("OPS-002", "CYBER-003", "CYBER-001");
@@ -86,14 +86,14 @@ class WhitespaceTolerantMatchingTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"goingconcern", "going-concern", "going_concern", "going.concern"})
-    void doesNotTreatOtherCharactersAsWhitespace(String text) {
+    void doesNotTreatOtherCharactersAsWhitespace(final String text) {
         assertThat(analyzer.analyze(text).findings()).isEmpty();
     }
 
     @Test
     void theSampleWrappedAt72ColumnsGivesTheSameFindings() {
-        String sample = ContractFixtures.text("samples/sample-10k-excerpt.txt");
-        String wrapped = wrap(sample, WRAP_COLUMNS);
+        final String sample = ContractFixtures.text("samples/sample-10k-excerpt.txt");
+        final String wrapped = wrap(sample, WRAP_COLUMNS);
         assertThat(wrapped.lines()).allMatch(line -> line.length() <= WRAP_COLUMNS);
 
         assertSameRulesAndCategories(sample, wrapped);
@@ -104,7 +104,7 @@ class WhitespaceTolerantMatchingTest {
 
     @Test
     void wrappedFindingsPointAtTheOriginalText() {
-        String wrapped = wrap(ContractFixtures.text("samples/sample-10k-excerpt.txt"), WRAP_COLUMNS).replace("\n", "\r\n");
+        final String wrapped = wrap(ContractFixtures.text("samples/sample-10k-excerpt.txt"), WRAP_COLUMNS).replace("\n", "\r\n");
 
         assertThat(analyzer.analyze(wrapped).findings()).isNotEmpty().allSatisfy(finding -> {
             assertThat(wrapped.startsWith(finding.matchedText(), finding.position())).isTrue();
@@ -115,9 +115,9 @@ class WhitespaceTolerantMatchingTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("adversarialInputs")
     void whitespaceHeavyInputCannotBacktrackCatastrophically(String name, String text) {
-        RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH);
+        final RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH);
 
-        double readsPerChar = assertTimeout(TestRules.GENEROUS_TIME_LIMIT,
+        final double readsPerChar = assertTimeout(TestRules.GENEROUS_TIME_LIMIT,
                 () -> CountingText.readsPerChar(rules, matcher, text));
 
         assertThat(readsPerChar).isLessThan(CountingText.MAX_LINEAR_READS_PER_CHAR);
@@ -125,10 +125,10 @@ class WhitespaceTolerantMatchingTest {
 
     @Test
     void theReadCountExposesSuperLinearMatching() {
-        RuleSet quadratic = new RuleSet("t", List.of(TestRules.rule("X-001",
+        final RuleSet quadratic = new RuleSet("t", List.of(TestRules.rule("X-001",
                 RiskCategory.MARKET, Severity.LOW,
                 WhitespaceTolerance.WHITESPACE_RUN + "x")));
-        RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH);
+        final RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH);
 
         assertThat(CountingText.readsPerChar(quadratic, matcher, " ".repeat(QUADRATIC_PROBE_LENGTH)))
                 .isGreaterThan(CountingText.MAX_LINEAR_READS_PER_CHAR);
@@ -144,9 +144,9 @@ class WhitespaceTolerantMatchingTest {
                 Arguments.of("only whitespace", twoMegabytes("", " \n\t\r ")));
     }
 
-    private void assertSameRulesAndCategories(String original, String variant) {
-        AnalysisResult expected = analyzer.analyze(original);
-        AnalysisResult actual = analyzer.analyze(variant);
+    private void assertSameRulesAndCategories(final String original, final String variant) {
+        final AnalysisResult expected = analyzer.analyze(original);
+        final AnalysisResult actual = analyzer.analyze(variant);
 
         assertThat(actual.findings()).extracting(Finding::ruleId)
                 .containsExactlyInAnyOrderElementsOf(expected.findings().stream().map(Finding::ruleId).toList());
@@ -154,15 +154,15 @@ class WhitespaceTolerantMatchingTest {
         assertThat(actual.overallRiskLevel()).isEqualTo(expected.overallRiskLevel());
     }
 
-    private Finding singleFinding(String text, String ruleId) {
-        List<Finding> findings = analyzer.analyze(text).findings();
+    private Finding singleFinding(final String text, final String ruleId) {
+        final List<Finding> findings = analyzer.analyze(text).findings();
         assertThat(findings).extracting(Finding::ruleId).contains(ruleId);
         return findings.stream().filter(f -> f.ruleId().equals(ruleId)).findFirst().orElseThrow();
     }
 
-    private static String twoMegabytes(String head, String repeated) {
-        StringBuilder text = new StringBuilder(TestRules.TWO_MB).append(head);
-        String unit = repeated.isEmpty() ? head : repeated;
+    private static String twoMegabytes(final String head, final String repeated) {
+        final StringBuilder text = new StringBuilder(TestRules.TWO_MB).append(head);
+        final String unit = repeated.isEmpty() ? head : repeated;
         while (text.length() < TestRules.TWO_MB) {
             text.append(unit);
         }
@@ -170,11 +170,11 @@ class WhitespaceTolerantMatchingTest {
     }
 
     /** Greedy word wrap of every line, like a plain-text EDGAR filing. */
-    private static String wrap(String text, int columns) {
-        StringBuilder out = new StringBuilder();
-        for (String line : text.split("\n", -1)) {
+    private static String wrap(final String text, final int columns) {
+        final StringBuilder out = new StringBuilder();
+        for (final String line : text.split("\n", -1)) {
             int lineLength = 0;
-            for (String word : line.split(" ")) {
+            for (final String word : line.split(" ")) {
                 if (lineLength > 0 && lineLength + 1 + word.length() > columns) {
                     out.append('\n');
                     lineLength = 0;

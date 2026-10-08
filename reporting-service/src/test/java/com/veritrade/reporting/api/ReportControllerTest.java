@@ -45,13 +45,13 @@ class ReportControllerTest {
 
     @Test
     void completedReportMatchesTheOpenApiSchema() {
-        Report report = Report.completed(filingId, RiskLevel.HIGH, 3, "1.0", GENERATED_AT);
+        final Report report = Report.completed(filingId, RiskLevel.HIGH, 3, "1.0", GENERATED_AT);
         report.addFinding(new FindingEntity(RiskCategory.LEGAL, Severity.HIGH, "LEGAL-001", "pending litigation", "We face pending litigation.", 41));
         report.addFinding(new FindingEntity(RiskCategory.CYBERSECURITY, Severity.CRITICAL, "CYBER-001", "breach", "A breach happened.", 211));
         report.addFinding(new FindingEntity(RiskCategory.LEGAL, Severity.LOW, "LEGAL-002", "lawsuit", "A lawsuit.", 5));
         when(reportService.findReport(filingId)).thenReturn(Optional.of(view(report)));
 
-        MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
+        final MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
 
         assertThat(result).hasStatusOk().hasContentTypeCompatibleWith(MediaType.APPLICATION_JSON);
         assertThat(OpenApiContract.validate("ReportResponse", body(result))).isEmpty();
@@ -82,7 +82,7 @@ class ReportControllerTest {
         when(reportService.findReport(filingId))
                 .thenReturn(Optional.of(view(Report.completed(filingId, RiskLevel.NONE, 0, "1.0", GENERATED_AT))));
 
-        MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
+        final MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(OpenApiContract.validate("ReportResponse", body(result))).isEmpty();
@@ -97,7 +97,7 @@ class ReportControllerTest {
         when(reportService.findReport(filingId)).thenReturn(Optional.of(
                 view(Report.failed(filingId, "Analysis failed after 3 attempts: rule engine error", GENERATED_AT))));
 
-        MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
+        final MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(OpenApiContract.validate("ReportResponse", body(result))).isEmpty();
@@ -118,7 +118,7 @@ class ReportControllerTest {
     void reportNotReadyYetIsA404ProblemDetail() {
         when(reportService.findReport(any())).thenReturn(Optional.empty());
 
-        MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
+        final MvcTestResult result = mvc.get().uri("/api/reports/{id}", filingId).exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND).hasContentTypeCompatibleWith(PROBLEM_JSON);
         assertThat(OpenApiContract.validate("ProblemDetail", body(result))).isEmpty();
@@ -131,8 +131,8 @@ class ReportControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"not-a-uuid", "123", "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a1Z", "%20"})
-    void malformedFilingIdIsA404ProblemDetailAsTheOpenApiDefinesNo400(String filingId) {
-        MvcTestResult result = mvc.get().uri("/api/reports/" + filingId).exchange();
+    void malformedFilingIdIsA404ProblemDetailAsTheOpenApiDefinesNo400(final String filingId) {
+        final MvcTestResult result = mvc.get().uri("/api/reports/" + filingId).exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND).hasContentTypeCompatibleWith(PROBLEM_JSON);
         assertThat(OpenApiContract.validate("ProblemDetail", body(result))).isEmpty();
@@ -154,16 +154,16 @@ class ReportControllerTest {
 
     @Test
     void unsupportedMethodIsAProblemDetail() {
-        MvcTestResult result = mvc.post().uri("/api/reports/{id}", filingId).exchange();
+        final MvcTestResult result = mvc.post().uri("/api/reports/{id}", filingId).exchange();
 
         assertThat(result).hasStatus(HttpStatus.METHOD_NOT_ALLOWED).hasContentTypeCompatibleWith(PROBLEM_JSON);
     }
 
-    private static ReportView view(Report report) {
+    private static ReportView view(final Report report) {
         return new ReportView(report, report.orderedFindings(), report.countByCategory(), report.countBySeverity());
     }
 
-    private static String body(MvcTestResult result) {
+    private static String body(final MvcTestResult result) {
         return new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 }

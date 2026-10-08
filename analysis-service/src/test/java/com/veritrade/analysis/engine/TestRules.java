@@ -31,24 +31,24 @@ final class TestRules {
     private TestRules() {
     }
 
-    static RiskRule rule(String id, RiskCategory category, Severity severity, String... patterns) {
-        List<Pattern> compiled = Arrays.stream(patterns).map(p -> Pattern.compile(p, RuleLoader.PATTERN_FLAGS)).toList();
+    static RiskRule rule(final String id, final RiskCategory category, final Severity severity, final String... patterns) {
+        final List<Pattern> compiled = Arrays.stream(patterns).map(p -> Pattern.compile(p, RuleLoader.PATTERN_FLAGS)).toList();
         return new RiskRule(id, category, severity, compiled);
     }
 
     static RuleSet bundledRules() {
         try (InputStream in = TestRules.class.getClassLoader().getResourceAsStream("risk-rules.yml")) {
             return new RuleLoader().load(in, "risk-rules.yml");
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    static RuleSet load(String yaml) {
+    static RuleSet load(final String yaml) {
         return new RuleLoader().load(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), "test.yml");
     }
 
-    static RiskAnalyzer analyzer(RuleSet rules) {
+    static RiskAnalyzer analyzer(final RuleSet rules) {
         return new RiskAnalyzer(rules, new RuleMatcher(DEFAULT_CAP, DEFAULT_MAX_MATCH),
                 new ExcerptExtractor(DEFAULT_CONTEXT, DEFAULT_MAX_EXCERPT), new RiskScorer(DEFAULT_THRESHOLD));
     }

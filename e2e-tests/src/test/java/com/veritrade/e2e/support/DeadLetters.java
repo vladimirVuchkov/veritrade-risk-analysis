@@ -22,13 +22,13 @@ public final class DeadLetters {
     }
 
     /** No dead-letter queue holds a message that mentions the token (a filing id or an event id). */
-    public static void assertNothingDeadLetteredFor(Broker broker, String token) {
+    public static void assertNothingDeadLetteredFor(final Broker broker, final String token) {
         ALL.forEach(queue -> assertThat(broker.peekMatching(queue, token)).as("%s mentions %s", queue, token).isEmpty());
     }
 
     /** Waits until the dead-letter queue holds exactly one message with the token and returns it. */
-    public static JsonNode awaitDeadLettered(Broker broker, String queue, String token) {
-        List<JsonNode> matching = await(queue + " holds " + token).atMost(Timeouts.MESSAGE_HANDLED)
+    public static JsonNode awaitDeadLettered(final Broker broker, final String queue, final String token) {
+        final List<JsonNode> matching = await(queue + " holds " + token).atMost(Timeouts.MESSAGE_HANDLED)
                 .pollInterval(Timeouts.POLL_INTERVAL)
                 .until(() -> broker.peekMatching(queue, token), messages -> !messages.isEmpty());
         assertThat(matching).as("copies of %s in %s", token, queue).hasSize(1);
@@ -36,7 +36,7 @@ public final class DeadLetters {
     }
 
     /** The x-death entry that RabbitMQ adds when a message is dead-lettered. */
-    public static JsonNode death(JsonNode deadLetter) {
+    public static JsonNode death(final JsonNode deadLetter) {
         return deadLetter.path("properties").path("headers").path("x-death").path(0);
     }
 }

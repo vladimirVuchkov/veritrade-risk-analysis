@@ -42,25 +42,25 @@ class PoisonMessageE2E extends E2ETestBase {
     enum Poison {
         NOT_JSON {
             @Override
-            String body(EventType routedAs, String token) {
+            String body(final EventType routedAs, final String token) {
                 return "this is not JSON " + token;
             }
         },
         JSON_ARRAY {
             @Override
-            String body(EventType routedAs, String token) {
+            String body(final EventType routedAs, final String token) {
                 return "[\"" + token + "\"]";
             }
         },
         UNKNOWN_EVENT_TYPE {
             @Override
-            String body(EventType routedAs, String token) {
+            String body(final EventType routedAs, final String token) {
                 return envelope("SOMETHING_NEW", token).toString();
             }
         },
         MISSING_PAYLOAD {
             @Override
-            String body(EventType routedAs, String token) {
+            String body(final EventType routedAs, final String token) {
                 ObjectNode event = envelope(routedAs.name(), token);
                 event.remove("payload");
                 return event.toString();
@@ -69,8 +69,8 @@ class PoisonMessageE2E extends E2ETestBase {
 
         abstract String body(EventType routedAs, String token);
 
-        private static ObjectNode envelope(String eventType, String token) {
-            ObjectNode event = Events.started(UUID.randomUUID(), UUID.randomUUID(), token);
+        private static ObjectNode envelope(final String eventType, final String token) {
+            final ObjectNode event = Events.started(UUID.randomUUID(), UUID.randomUUID(), token);
             event.put("eventType", eventType);
             return event;
         }
@@ -83,9 +83,9 @@ class PoisonMessageE2E extends E2ETestBase {
 
     @ParameterizedTest(name = "{1} on {0}")
     @MethodSource("poisonedRoutes")
-    void poisonGoesStraightToTheMatchingDeadLetterQueueAndValidFilingsStillFlow(EventType routedAs, Poison poison) {
-        String token = correlationId("poison");
-        Instant published = Instant.now();
+    void poisonGoesStraightToTheMatchingDeadLetterQueueAndValidFilingsStillFlow(final EventType routedAs, final Poison poison) {
+        final String token = correlationId("poison");
+        final Instant published = Instant.now();
 
         broker.publish(routedAs.routingKey(), poison.body(routedAs, token), MessageProperties.contract(token, token));
 
@@ -97,9 +97,9 @@ class PoisonMessageE2E extends E2ETestBase {
 
     @Test
     void analysisEventForAnUnknownFilingIsDeadLetteredByIngestion() {
-        String token = correlationId("unknown-filing");
-        ObjectNode started = Events.started(UUID.randomUUID(), UUID.randomUUID(), token);
-        Instant published = Instant.now();
+        final String token = correlationId("unknown-filing");
+        final ObjectNode started = Events.started(UUID.randomUUID(), UUID.randomUUID(), token);
+        final Instant published = Instant.now();
 
         broker.publishEvent(started);
 
@@ -107,19 +107,19 @@ class PoisonMessageE2E extends E2ETestBase {
         assertValidFilingStillFlows();
     }
 
-    private static void assertDeadLetteredWithoutRetries(String queue, String token, Instant published) {
-        JsonNode deadLetter = DeadLetters.awaitDeadLettered(broker, queue, token);
-        Duration elapsed = Duration.between(published, Instant.now());
+    private static void assertDeadLetteredWithoutRetries(final String queue, final String token, final Instant published) {
+        final JsonNode deadLetter = DeadLetters.awaitDeadLettered(broker, queue, token);
+        final Duration elapsed = Duration.between(published, Instant.now());
         assertThat(elapsed).as("time to %s (3 attempts need at least %s)", queue, Timeouts.MIN_RETRY_BACKOFF)
                 .isLessThan(Timeouts.MIN_RETRY_BACKOFF);
-        JsonNode death = DeadLetters.death(deadLetter);
+        final JsonNode death = DeadLetters.death(deadLetter);
         assertThat(death.path("count").asInt()).isOne();
         assertThat(death.path("reason").asString()).isEqualTo("rejected");
         assertThat(death.path("queue").asString()).isEqualTo(queue.substring(0, queue.lastIndexOf('.')));
     }
 
     private static void assertValidFilingStillFlows() {
-        UUID filingId = api.submitAccepted(FilingRequest.noRisk("After a poison message"));
+        final UUID filingId = api.submitAccepted(FilingRequest.noRisk("After a poison message"));
         api.awaitStatus(filingId, "COMPLETED");
         assertThat(api.awaitReport(filingId).path("status").asString()).isEqualTo("COMPLETED");
     }

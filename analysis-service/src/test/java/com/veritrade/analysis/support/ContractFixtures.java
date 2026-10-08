@@ -33,31 +33,31 @@ public final class ContractFixtures {
     }
 
     /** Schema violations of an event; empty when the event is valid. */
-    public static List<Error> validate(EventType type, JsonNode event) {
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + fileStem(type) + ".schema.json"));
+    public static List<Error> validate(final EventType type, final JsonNode event) {
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + fileStem(type) + ".schema.json"));
         return schema.validate(event);
     }
 
-    public static List<Error> validate(EventType type, byte[] body) {
+    public static List<Error> validate(final EventType type, final byte[] body) {
         return validate(type, MAPPER.readTree(body));
     }
 
-    public static ObjectNode example(EventType type) {
+    public static ObjectNode example(final EventType type) {
         return (ObjectNode) MAPPER.readTree(text("contracts/examples/" + fileStem(type) + ".json"));
     }
 
-    public static String text(String classpathResource) {
+    public static String text(final String classpathResource) {
         try (InputStream in = ContractFixtures.class.getClassLoader().getResourceAsStream(classpathResource)) {
             if (in == null) {
                 throw new IllegalStateException("Missing test resource " + classpathResource);
             }
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private static String fileStem(EventType type) {
+    private static String fileStem(final EventType type) {
         return type.name().toLowerCase().replace('_', '-');
     }
 }

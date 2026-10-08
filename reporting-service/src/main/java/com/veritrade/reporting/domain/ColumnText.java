@@ -10,7 +10,7 @@ public final class ColumnText {
     private ColumnText() {
     }
 
-    public static String fit(String text, int maxUtf16Units) {
+    public static String fit(final String text, final int maxUtf16Units) {
         if (text == null || text.length() <= maxUtf16Units) {
             return text;
         }

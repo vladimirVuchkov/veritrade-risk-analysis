@@ -44,12 +44,12 @@ class RepositoryTest {
 
     @Test
     void listsNewestFirstAndRespectsTheLimit() {
-        Filing oldest = save(T0);
-        Filing middle = save(T0.plusSeconds(1));
-        Filing newest = save(T0.plusSeconds(2));
+        final Filing oldest = save(T0);
+        final Filing middle = save(T0.plusSeconds(1));
+        final Filing newest = save(T0.plusSeconds(2));
 
-        List<FilingView> all = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(10));
-        List<FilingView> two = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(2));
+        final List<FilingView> all = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(10));
+        final List<FilingView> two = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(2));
 
         assertThat(all).extracting(FilingView::id).containsExactly(newest.id(), middle.id(), oldest.id());
         assertThat(two).extracting(FilingView::id).containsExactly(newest.id(), middle.id());
@@ -57,10 +57,10 @@ class RepositoryTest {
 
     @Test
     void breaksTimestampTiesByIdSoTheOrderIsStable() {
-        Filing first = save(T0);
-        Filing second = save(T0);
+        final Filing first = save(T0);
+        final Filing second = save(T0);
 
-        List<UUID> listed = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(10)).stream().map(FilingView::id).toList();
+        final List<UUID> listed = filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(10)).stream().map(FilingView::id).toList();
 
         assertThat(listed).containsExactlyInAnyOrder(first.id(), second.id());
         assertThat(listed.getFirst().toString()).isGreaterThan(listed.getLast().toString());
@@ -68,7 +68,7 @@ class RepositoryTest {
 
     @Test
     void readsTheViewOfOneFiling() {
-        Filing filing = save(T0);
+        final Filing filing = save(T0);
         filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "rule engine error", T0.plusSeconds(5));
         flushAndClear();
 
@@ -79,7 +79,7 @@ class RepositoryTest {
 
     @Test
     void readsTheStateOfOneFilingWithItsVersion() {
-        Filing filing = save(T0);
+        final Filing filing = save(T0);
 
         assertThat(filings.findStateById(filing.id())).contains(new FilingState(filing.id(), FilingStatus.SUBMITTED, 0L));
         assertThat(filings.findStateById(UUID.randomUUID())).isEmpty();
@@ -87,13 +87,13 @@ class RepositoryTest {
 
     @Test
     void changesTheStatusAndIncrementsTheVersion() {
-        Filing filing = save(T0);
+        final Filing filing = save(T0);
         flushAndClear();
 
-        int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(5));
+        final int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(5));
 
         assertThat(changed).isEqualTo(1);
-        Filing loaded = filings.findById(filing.id()).orElseThrow();
+        final Filing loaded = filings.findById(filing.id()).orElseThrow();
         assertThat(loaded.status()).isEqualTo(FilingStatus.FAILED);
         assertThat(loaded.failureReason()).isEqualTo("boom");
         assertThat(loaded.updatedAt()).isEqualTo(T0.plusSeconds(5));
@@ -103,10 +103,10 @@ class RepositoryTest {
 
     @Test
     void doesNotChangeTheStatusWithAStaleVersion() {
-        Filing filing = save(T0);
+        final Filing filing = save(T0);
         filings.changeStatus(filing.id(), 0L, FilingStatus.ANALYZING, null, T0.plusSeconds(1));
 
-        int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(2));
+        final int changed = filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "boom", T0.plusSeconds(2));
 
         assertThat(changed).isZero();
         assertThat(filings.findStateById(filing.id()).orElseThrow())
@@ -116,24 +116,24 @@ class RepositoryTest {
 
     @Test
     void persistsMicrosecondTimestampsAndLongContent() {
-        Instant precise = Instant.parse("2026-10-07T12:00:00.123456Z");
-        Filing filing = filings.save(Filing.submit(UUID.randomUUID(), "Acme", "10-K", "x".repeat(2_097_152), precise));
+        final Instant precise = Instant.parse("2026-10-07T12:00:00.123456Z");
+        final Filing filing = filings.save(Filing.submit(UUID.randomUUID(), "Acme", "10-K", "x".repeat(2_097_152), precise));
         flushAndClear();
 
-        Filing loaded = filings.findById(filing.id()).orElseThrow();
+        final Filing loaded = filings.findById(filing.id()).orElseThrow();
         assertThat(loaded.submittedAt()).isEqualTo(precise);
         assertThat(loaded.content()).hasSize(2_097_152);
     }
 
     @Test
     void columnsCountUtf16UnitsSoFourByteCharactersTakeTwo() {
-        String company = "\uD83D\uDE00".repeat(100);
-        String title = "\uD83D\uDE00".repeat(150);
-        Filing filing = filings.save(Filing.submit(UUID.randomUUID(), company, title, "text", T0));
+        final String company = "\uD83D\uDE00".repeat(100);
+        final String title = "\uD83D\uDE00".repeat(150);
+        final Filing filing = filings.save(Filing.submit(UUID.randomUUID(), company, title, "text", T0));
         flushAndClear();
         filings.changeStatus(filing.id(), 0L, FilingStatus.FAILED, "\uD83D\uDE00".repeat(500), T0);
 
-        Filing loaded = filings.findById(filing.id()).orElseThrow();
+        final Filing loaded = filings.findById(filing.id()).orElseThrow();
         assertThat(loaded.companyName()).isEqualTo(company).hasSize(200);
         assertThat(loaded.title()).isEqualTo(title).hasSize(300);
         assertThat(loaded.failureReason()).hasSize(1000);
@@ -141,12 +141,12 @@ class RepositoryTest {
 
     @Test
     void returnsUnpublishedEventsOldestFirst() {
-        OutboxEvent newer = saveEvent(T0.plusSeconds(2));
-        OutboxEvent older = saveEvent(T0);
-        OutboxEvent published = saveEvent(T0.plusSeconds(1));
+        final OutboxEvent newer = saveEvent(T0.plusSeconds(2));
+        final OutboxEvent older = saveEvent(T0);
+        final OutboxEvent published = saveEvent(T0.plusSeconds(1));
         outbox.markPublished(published.id(), T0.plusSeconds(3));
 
-        List<OutboxEvent> batch = outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(10));
+        final List<OutboxEvent> batch = outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(10));
 
         assertThat(batch).extracting(OutboxEvent::id).containsExactly(older.id(), newer.id());
         assertThat(outbox.findByPublishedAtIsNullAndParkedAtIsNullOrderByCreatedAtAscIdAsc(Limit.of(1)))
@@ -155,9 +155,9 @@ class RepositoryTest {
 
     @Test
     void leavesParkedEventsOutOfTheBatchAndKeepsTheOrderOfTheOthers() {
-        OutboxEvent first = saveEvent(T0);
-        OutboxEvent parked = saveEvent(T0.plusSeconds(1));
-        OutboxEvent last = saveEvent(T0.plusSeconds(2));
+        final OutboxEvent first = saveEvent(T0);
+        final OutboxEvent parked = saveEvent(T0.plusSeconds(1));
+        final OutboxEvent last = saveEvent(T0.plusSeconds(2));
         outbox.recordFailedAttempt(parked.id(), "boom");
         outbox.parkIfExhausted(parked.id(), 1, T0.plusSeconds(3));
 
@@ -167,12 +167,12 @@ class RepositoryTest {
 
     @Test
     void countsFailedAttemptsAndParksOnlyAtTheMaximum() {
-        OutboxEvent event = saveEvent(T0);
+        final OutboxEvent event = saveEvent(T0);
 
         outbox.recordFailedAttempt(event.id(), "first");
-        int parkedTooEarly = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(1));
+        final int parkedTooEarly = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(1));
         outbox.recordFailedAttempt(event.id(), "second");
-        int parked = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(2));
+        final int parked = outbox.parkIfExhausted(event.id(), 2, T0.plusSeconds(2));
 
         assertThat(parkedTooEarly).isZero();
         assertThat(parked).isEqualTo(1);
@@ -183,7 +183,7 @@ class RepositoryTest {
 
     @Test
     void doesNotCountOrParkAPublishedEvent() {
-        OutboxEvent event = saveEvent(T0);
+        final OutboxEvent event = saveEvent(T0);
         outbox.markPublished(event.id(), T0.plusSeconds(1));
 
         assertThat(outbox.recordFailedAttempt(event.id(), "late")).isZero();
@@ -192,7 +192,7 @@ class RepositoryTest {
 
     @Test
     void anEventStartsWithNoAttemptsAndUnparked() {
-        OutboxEvent event = saveEvent(T0);
+        final OutboxEvent event = saveEvent(T0);
 
         assertThat(outboxColumns(event.id())).containsEntry("ATTEMPTS", 0).containsEntry("LAST_ERROR", null)
                 .containsEntry("PARKED_AT", null);
@@ -200,10 +200,10 @@ class RepositoryTest {
 
     @Test
     void marksAnEventPublishedOnlyOnce() {
-        OutboxEvent event = saveEvent(T0);
+        final OutboxEvent event = saveEvent(T0);
 
-        int first = outbox.markPublished(event.id(), T0.plusSeconds(1));
-        int second = outbox.markPublished(event.id(), T0.plusSeconds(2));
+        final int first = outbox.markPublished(event.id(), T0.plusSeconds(1));
+        final int second = outbox.markPublished(event.id(), T0.plusSeconds(2));
 
         assertThat(first).isEqualTo(1);
         assertThat(second).isZero();
@@ -211,19 +211,19 @@ class RepositoryTest {
         assertThat(outbox.markPublished(UUID.randomUUID(), T0)).isZero();
     }
 
-    private Filing save(Instant submittedAt) {
-        Filing filing = filings.save(Filing.submit(UUID.randomUUID(), "Acme", "10-K", "text", submittedAt));
+    private Filing save(final Instant submittedAt) {
+        final Filing filing = filings.save(Filing.submit(UUID.randomUUID(), "Acme", "10-K", "text", submittedAt));
         filings.flush();
         return filing;
     }
 
-    private OutboxEvent saveEvent(Instant createdAt) {
-        OutboxEvent event = outbox.save(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "corr", "{}", createdAt));
+    private OutboxEvent saveEvent(final Instant createdAt) {
+        final OutboxEvent event = outbox.save(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "corr", "{}", createdAt));
         outbox.flush();
         return event;
     }
 
-    private Map<String, Object> outboxColumns(UUID id) {
+    private Map<String, Object> outboxColumns(final UUID id) {
         return jdbc.queryForMap("select attempts, last_error, parked_at from outbox where id = ?", id);
     }
 

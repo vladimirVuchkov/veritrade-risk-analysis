@@ -52,7 +52,7 @@ class FilingControllerTest {
 
     @Test
     void acceptsAFilingWith202LocationAndBody() throws Exception {
-        UUID id = UUID.fromString("3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12");
+        final UUID id = UUID.fromString("3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12");
         when(filingService.submit(any(), anyString())).thenReturn(view(id, FilingStatus.SUBMITTED, null));
 
         submit(VALID_BODY)
@@ -119,7 +119,7 @@ class FilingControllerTest {
 
     @Test
     void returnsAFilingStatus() throws Exception {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
         when(filingService.get(id)).thenReturn(view(id, FilingStatus.FAILED, "rule engine error"));
 
         mvc.perform(get("/api/filings/{id}", id))
@@ -135,7 +135,7 @@ class FilingControllerTest {
 
     @Test
     void unknownFilingIsA404ProblemDetail() throws Exception {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
         when(filingService.get(id)).thenThrow(new FilingNotFoundException(id));
 
         expectProblem(mvc.perform(get("/api/filings/{id}", id)), 404, "Filing not found")
@@ -151,8 +151,8 @@ class FilingControllerTest {
 
     @Test
     void listsFilingsInTheOrderOfTheService() throws Exception {
-        UUID newer = UUID.randomUUID();
-        UUID older = UUID.randomUUID();
+        final UUID newer = UUID.randomUUID();
+        final UUID older = UUID.randomUUID();
         when(filingService.listRecent(null)).thenReturn(List.of(
                 view(newer, FilingStatus.SUBMITTED, null), view(older, FilingStatus.COMPLETED, null)));
 
@@ -200,11 +200,11 @@ class FilingControllerTest {
         expectProblem(mvc.perform(delete("/api/filings/{id}", UUID.randomUUID())), 405, "Method Not Allowed");
     }
 
-    private ResultActions submit(String body) throws Exception {
+    private ResultActions submit(final String body) throws Exception {
         return mvc.perform(post("/api/filings").contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    private static ResultActions expectProblem(ResultActions actions, int status, String title) throws Exception {
+    private static ResultActions expectProblem(final ResultActions actions, final int status, final String title) throws Exception {
         return actions
                 .andExpect(status().is(status))
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -213,7 +213,7 @@ class FilingControllerTest {
                 .andExpect(header().exists("X-Correlation-Id"));
     }
 
-    private static FilingView view(UUID id, FilingStatus status, String failureReason) {
+    private static FilingView view(final UUID id, final FilingStatus status, final String failureReason) {
         return new FilingView(id, "Acme", "10-K", status, SUBMITTED_AT, failureReason);
     }
 }

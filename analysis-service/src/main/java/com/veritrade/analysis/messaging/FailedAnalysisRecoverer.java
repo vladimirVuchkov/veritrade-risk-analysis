@@ -33,40 +33,40 @@ public class FailedAnalysisRecoverer implements MessageRecoverer {
     private final AnalysisEventPublisher publisher;
 
     public FailedAnalysisRecoverer(
-            FilingSubmittedReader reader, AnalysisEventFactory events, AnalysisEventPublisher publisher) {
+            final FilingSubmittedReader reader, final AnalysisEventFactory events, final AnalysisEventPublisher publisher) {
         this.reader = reader;
         this.events = events;
         this.publisher = publisher;
     }
 
     @Override
-    public void recover(Message message, Throwable cause) {
+    public void recover(final Message message, final Throwable cause) {
         if (InvalidFilingMessageException.isCauseOf(cause)) {
             log.warn("Sending invalid message {} to the dead-letter queue: {}",
                     message.getMessageProperties().getMessageId(), mostSpecificMessage(cause));
             throw new AmqpRejectAndDontRequeueException("Invalid filing.submitted message", cause);
         }
-        EventEnvelope<FilingSubmittedPayload> event = reader.read(message);
+        final EventEnvelope<FilingSubmittedPayload> event = reader.read(message);
         try (MDC.MDCCloseable ignored = MDC.putCloseable(CorrelationIds.MDC_KEY, event.correlationId())) {
             publishFailure(event, cause);
         }
     }
 
-    private void publishFailure(EventEnvelope<FilingSubmittedPayload> event, Throwable cause) {
+    private void publishFailure(final EventEnvelope<FilingSubmittedPayload> event, final Throwable cause) {
         log.error("Analysis of filing {} failed after all retries", event.payload().filingId(), cause);
         try {
             publisher.publish(events.failed(event.payload().filingId(), event.correlationId(),
                     REASON_PREFIX + mostSpecificMessage(cause)));
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             log.error("Could not publish analysis.failed for filing {}; dead-lettering the message",
                     event.payload().filingId(), e);
             throw new AmqpRejectAndDontRequeueException("analysis.failed could not be published", e);
         }
     }
 
-    private static String mostSpecificMessage(Throwable cause) {
-        Throwable specific = NestedExceptionUtils.getMostSpecificCause(cause);
-        String detail = specific.getMessage();
+    private static String mostSpecificMessage(final Throwable cause) {
+        final Throwable specific = NestedExceptionUtils.getMostSpecificCause(cause);
+        final String detail = specific.getMessage();
         return detail == null || detail.isBlank()
                 ? specific.getClass().getSimpleName()
                 : specific.getClass().getSimpleName() + ": " + detail;

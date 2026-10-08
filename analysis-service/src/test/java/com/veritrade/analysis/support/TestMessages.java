@@ -34,26 +34,26 @@ public final class TestMessages {
     }
 
     /** The contract example of filing.submitted with a fresh filing id. */
-    public static ObjectNode filingSubmitted(UUID filingId) {
-        ObjectNode event = ContractFixtures.example(EventType.FILING_SUBMITTED);
+    public static ObjectNode filingSubmitted(final UUID filingId) {
+        final ObjectNode event = ContractFixtures.example(EventType.FILING_SUBMITTED);
         ((ObjectNode) event.get("payload")).put("filingId", filingId.toString());
         return event;
     }
 
-    public static Message message(ObjectNode event) {
+    public static Message message(final ObjectNode event) {
         return message(event.toString(), false);
     }
 
-    public static Message message(String body, boolean redelivered) {
-        MessageProperties properties = new MessageProperties();
+    public static Message message(final String body, final boolean redelivered) {
+        final MessageProperties properties = new MessageProperties();
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         properties.setRedelivered(redelivered);
         return new Message(body.getBytes(StandardCharsets.UTF_8), properties);
     }
 
     public static RiskAnalyzer bundledAnalyzer() {
-        String rules = ContractFixtures.text("risk-rules.yml");
-        RuleSet ruleSet = new RuleLoader().load(
+        final String rules = ContractFixtures.text("risk-rules.yml");
+        final RuleSet ruleSet = new RuleLoader().load(
                 new ByteArrayInputStream(rules.getBytes(StandardCharsets.UTF_8)), "risk-rules.yml");
         return new RiskAnalyzer(ruleSet, new RuleMatcher(CAP, MAX_MATCH), new ExcerptExtractor(CONTEXT, MAX_EXCERPT),
                 new RiskScorer(THRESHOLD));

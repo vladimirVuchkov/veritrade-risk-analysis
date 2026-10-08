@@ -45,8 +45,8 @@ class AnalysisEventListenerTest {
 
     @ParameterizedTest
     @EnumSource(value = EventType.class, names = "FILING_SUBMITTED", mode = EnumSource.Mode.EXCLUDE)
-    void passesEveryAnalysisEventToTheStatusService(EventType type) {
-        UUID filingId = UUID.randomUUID();
+    void passesEveryAnalysisEventToTheStatusService(final EventType type) {
+        final UUID filingId = UUID.randomUUID();
 
         listener.onMessage(message(Contracts.exampleFor(type, filingId).toString(), null));
 
@@ -56,9 +56,9 @@ class AnalysisEventListenerTest {
 
     @Test
     void putsTheEnvelopeCorrelationIdInTheLoggingContextAndClearsItAfterwards() {
-        ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, UUID.randomUUID());
+        final ObjectNode event = Contracts.exampleFor(EventType.ANALYSIS_STARTED, UUID.randomUUID());
         event.put("correlationId", "from-envelope");
-        AtomicReference<String> seen = new AtomicReference<>();
+        final AtomicReference<String> seen = new AtomicReference<>();
         when(statusService.apply(any())).thenAnswer(invocation -> {
             seen.set(MDC.get(CorrelationIds.MDC_KEY));
             return StatusChange.APPLIED;
@@ -99,7 +99,7 @@ class AnalysisEventListenerTest {
 
     @Test
     void eventForAnUnknownFilingIsInvalid() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
         when(statusService.apply(any())).thenThrow(new FilingNotFoundException(filingId));
 
         assertThatThrownBy(() -> listener.onMessage(
@@ -118,7 +118,7 @@ class AnalysisEventListenerTest {
                 .satisfies(e -> assertThat(InvalidEventException.isUnprocessable(e)).isFalse());
     }
 
-    private static FilingStatus target(EventType type) {
+    private static FilingStatus target(final EventType type) {
         return switch (type) {
             case ANALYSIS_STARTED -> FilingStatus.ANALYZING;
             case ANALYSIS_COMPLETED -> FilingStatus.COMPLETED;
@@ -126,8 +126,8 @@ class AnalysisEventListenerTest {
         };
     }
 
-    private static Message message(String body, String correlationId) {
-        MessageBuilder builder = MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8));
+    private static Message message(final String body, final String correlationId) {
+        final MessageBuilder builder = MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8));
         if (correlationId != null) {
             builder.setCorrelationId(correlationId);
         }

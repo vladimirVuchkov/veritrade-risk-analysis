@@ -46,8 +46,8 @@ class RestartIT {
 
     @Test
     void reportAndIdempotencyMarkersSurviveARestart() {
-        UUID filingId = UUID.randomUUID();
-        EventEnvelope<AnalysisCompletedPayload> event = completedEnvelope(completed(filingId, RiskLevel.HIGH,
+        final UUID filingId = UUID.randomUUID();
+        final EventEnvelope<AnalysisCompletedPayload> event = completedEnvelope(completed(filingId, RiskLevel.HIGH,
                 List.of(finding(RiskCategory.LEGAL, Severity.HIGH, 4))));
         String reportBeforeRestart;
         try (ConfigurableApplicationContext first = start()) {
@@ -59,7 +59,7 @@ class RestartIT {
             assertThat(get(second, filingId).body()).isEqualTo(reportBeforeRestart);
 
             send(second, event);
-            UUID sentinel = UUID.randomUUID();
+            final UUID sentinel = UUID.randomUUID();
             send(second, failedEnvelope(failed(sentinel, "sentinel")));
             awaitReport(second, sentinel);
 
@@ -69,35 +69,35 @@ class RestartIT {
     }
 
     private ConfigurableApplicationContext start() {
-        Map<String, Object> properties = new HashMap<>(RabbitTestContainer.connectionProperties("restart-it"));
+        final Map<String, Object> properties = new HashMap<>(RabbitTestContainer.connectionProperties("restart-it"));
         properties.put("spring.datasource.url", "jdbc:h2:file:" + dataDirectory.resolve("reporting"));
         properties.put("server.port", 0);
-        String[] arguments = properties.entrySet().stream()
+        final String[] arguments = properties.entrySet().stream()
                 .map(property -> "--" + property.getKey() + "=" + property.getValue())
                 .toArray(String[]::new);
         return new SpringApplicationBuilder(ReportingApplication.class).run(arguments);
     }
 
-    private static void send(ConfigurableApplicationContext context, EventEnvelope<?> event) {
+    private static void send(final ConfigurableApplicationContext context, final EventEnvelope<?> event) {
         context.getBean(RabbitTemplate.class).send(MessagingTopology.EVENTS_EXCHANGE,
                 event.eventType().routingKey(), producerMessage(event));
     }
 
-    private static String awaitReport(ConfigurableApplicationContext context, UUID filingId) {
+    private static String awaitReport(final ConfigurableApplicationContext context, final UUID filingId) {
         return await().atMost(TIMEOUT)
                 .until(() -> get(context, filingId), response -> response.statusCode() == OK)
                 .body();
     }
 
-    private static HttpResponse<String> get(ConfigurableApplicationContext context, UUID filingId) {
-        String port = context.getEnvironment().getProperty("local.server.port");
-        HttpRequest request = HttpRequest.newBuilder(
+    private static HttpResponse<String> get(final ConfigurableApplicationContext context, final UUID filingId) {
+        final String port = context.getEnvironment().getProperty("local.server.port");
+        final HttpRequest request = HttpRequest.newBuilder(
                 URI.create("http://localhost:" + port + "/api/reports/" + filingId)).build();
         try (HttpClient client = HttpClient.newHttpClient()) {
             return client.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }

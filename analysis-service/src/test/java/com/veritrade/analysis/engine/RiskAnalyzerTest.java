@@ -31,8 +31,8 @@ class RiskAnalyzerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "\n\t  \r\n"})
-    void emptyOrWhitespaceTextHasNoFindingsAndRiskNone(String text) {
-        AnalysisResult result = analyzer.analyze(text);
+    void emptyOrWhitespaceTextHasNoFindingsAndRiskNone(final String text) {
+        final AnalysisResult result = analyzer.analyze(text);
 
         assertThat(result.findings()).isEmpty();
         assertThat(result.totalFindings()).isZero();
@@ -43,7 +43,7 @@ class RiskAnalyzerTest {
 
     @Test
     void unrelatedTextHasNoFindings() {
-        AnalysisResult result = analyzer.analyze("Revenue grew 12% and we opened three new offices in Austin.");
+        final AnalysisResult result = analyzer.analyze("Revenue grew 12% and we opened three new offices in Austin.");
 
         assertThat(result.findings()).isEmpty();
         assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.NONE);
@@ -58,8 +58,8 @@ class RiskAnalyzerTest {
         "REGULATORY, REG-001, 'We are the subject of a regulatory investigation.'",
         "MARKET, MKT-001, 'We face intense competition in every market.'"
     })
-    void findsOneMatchPerCategory(RiskCategory category, String ruleId, String text) {
-        AnalysisResult result = analyzer.analyze(text);
+    void findsOneMatchPerCategory(final RiskCategory category, final String ruleId, final String text) {
+        final AnalysisResult result = analyzer.analyze(text);
 
         assertThat(result.findings()).singleElement().satisfies(finding -> {
             assertThat(finding.category()).isEqualTo(category);
@@ -72,11 +72,11 @@ class RiskAnalyzerTest {
 
     @Test
     void reproducesTheFindingsOfTheContractExample() {
-        String content = ContractFixtures.example(EventType.FILING_SUBMITTED).get("payload").get("content").asString();
-        AnalysisCompletedPayload expected = ContractFixtures.MAPPER.treeToValue(
+        final String content = ContractFixtures.example(EventType.FILING_SUBMITTED).get("payload").get("content").asString();
+        final AnalysisCompletedPayload expected = ContractFixtures.MAPPER.treeToValue(
                 ContractFixtures.example(EventType.ANALYSIS_COMPLETED).get("payload"), AnalysisCompletedPayload.class);
 
-        AnalysisResult result = analyzer.analyze(content);
+        final AnalysisResult result = analyzer.analyze(content);
 
         assertThat(result.findings()).extracting(RiskAnalyzerTest::toPayload).isEqualTo(expected.findings());
         assertThat(result.overallRiskLevel()).isEqualTo(expected.summary().overallRiskLevel());
@@ -86,7 +86,7 @@ class RiskAnalyzerTest {
 
     @Test
     void findsTheExpectedRisksInTheSample10K() {
-        AnalysisResult result = analyzer.analyze(ContractFixtures.text("samples/sample-10k-excerpt.txt"));
+        final AnalysisResult result = analyzer.analyze(ContractFixtures.text("samples/sample-10k-excerpt.txt"));
 
         assertThat(result.findings()).extracting(Finding::ruleId).containsExactlyInAnyOrder(
                 "FIN-001", "FIN-002", "FIN-007", "FIN-003", "FIN-003", "FIN-004",
@@ -107,7 +107,7 @@ class RiskAnalyzerTest {
 
     @Test
     void countsFindingsPerCategoryAndOmitsCategoriesWithout() {
-        AnalysisResult result = analyzer.analyze(
+        final AnalysisResult result = analyzer.analyze(
                 "pending litigation, an adverse judgment, and a data breach; also pending litigation.");
 
         assertThat(result.byCategory()).containsOnly(
@@ -117,14 +117,14 @@ class RiskAnalyzerTest {
 
     @Test
     void keepsOverlapsOfDifferentRulesOrderedByPositionThenRuleId() {
-        RuleSet rules = new RuleSet("t", List.of(
+        final RuleSet rules = new RuleSet("t", List.of(
                 rule("B-002", RiskCategory.CYBERSECURITY, Severity.LOW, "breach"),
                 rule("A-001", RiskCategory.CYBERSECURITY, Severity.HIGH, "breach of contract"),
                 rule("C-003", RiskCategory.LEGAL, Severity.LOW, "contract")));
-        RiskAnalyzer custom = TestRules.analyzer(rules);
-        String text = "contract terms; breach of contract";
+        final RiskAnalyzer custom = TestRules.analyzer(rules);
+        final String text = "contract terms; breach of contract";
 
-        AnalysisResult first = custom.analyze(text);
+        final AnalysisResult first = custom.analyze(text);
 
         assertThat(first.findings()).extracting(Finding::ruleId, Finding::position)
                 .containsExactly(
@@ -137,7 +137,7 @@ class RiskAnalyzerTest {
 
     @Test
     void capsFindingsPerRule() {
-        AnalysisResult result = analyzer.analyze("There is pending litigation. ".repeat(DEFAULT_CAP + 1));
+        final AnalysisResult result = analyzer.analyze("There is pending litigation. ".repeat(DEFAULT_CAP + 1));
 
         assertThat(result.findings()).hasSize(DEFAULT_CAP).allMatch(f -> f.ruleId().equals("LEGAL-001"));
         assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.CRITICAL);
@@ -145,11 +145,11 @@ class RiskAnalyzerTest {
 
     @Test
     void handlesMultibyteTextWithCorrectPositionsAndExcerpts() {
-        String text = "Отчёт 😀 компании: 我们面临 pending litigation 😀 и риски.";
+        final String text = "Отчёт 😀 компании: 我们面临 pending litigation 😀 и риски.";
 
-        AnalysisResult result = analyzer.analyze(text);
+        final AnalysisResult result = analyzer.analyze(text);
 
-        Finding finding = result.findings().getFirst();
+        final Finding finding = result.findings().getFirst();
         assertThat(finding.position()).isEqualTo(text.indexOf("pending litigation"));
         assertThat(finding.matchedText()).isEqualTo("pending litigation");
         assertThat(finding.excerpt()).isEqualTo(text);
@@ -157,10 +157,10 @@ class RiskAnalyzerTest {
 
     @Test
     void excerptsAreBoundedAndMatchesAtTheEdgesAreSafe() {
-        String filler = "x".repeat(DEFAULT_CONTEXT * 2);
-        String text = "pending litigation " + filler + " pending litigation";
+        final String filler = "x".repeat(DEFAULT_CONTEXT * 2);
+        final String text = "pending litigation " + filler + " pending litigation";
 
-        List<Finding> findings = analyzer.analyze(text).findings();
+        final List<Finding> findings = analyzer.analyze(text).findings();
 
         assertThat(findings).hasSize(2);
         assertThat(findings.getFirst().position()).isZero();
@@ -171,9 +171,9 @@ class RiskAnalyzerTest {
 
     @Test
     void capsEveryRuleOnTwoMegabytes() {
-        AnalysisResult result = analyzer.analyze(twoMegabytesOfSample());
+        final AnalysisResult result = analyzer.analyze(twoMegabytesOfSample());
 
-        Map<String, Long> perRule = result.findings().stream()
+        final Map<String, Long> perRule = result.findings().stream()
                 .collect(Collectors.groupingBy(Finding::ruleId, Collectors.counting()));
         assertThat(perRule.values()).allMatch(count -> count <= DEFAULT_CAP);
         assertThat(perRule).containsEntry("FIN-002", (long) DEFAULT_CAP);
@@ -182,10 +182,10 @@ class RiskAnalyzerTest {
 
     @Test
     void analysesTwoMegabytesInLinearTime() {
-        RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, TestRules.DEFAULT_MAX_MATCH);
-        String text = twoMegabytesOfSample();
+        final RuleMatcher matcher = new RuleMatcher(DEFAULT_CAP, TestRules.DEFAULT_MAX_MATCH);
+        final String text = twoMegabytesOfSample();
 
-        double readsPerChar = assertTimeout(TestRules.GENEROUS_TIME_LIMIT,
+        final double readsPerChar = assertTimeout(TestRules.GENEROUS_TIME_LIMIT,
                 () -> CountingText.readsPerChar(TestRules.bundledRules(), matcher, text));
 
         assertThat(readsPerChar).isLessThan(CountingText.MAX_LINEAR_READS_PER_CHAR);
@@ -193,7 +193,7 @@ class RiskAnalyzerTest {
 
     @Test
     void analysesTwoMegabytesWithinAGenerousTimeLimit() {
-        String text = twoMegabytesOfSample();
+        final String text = twoMegabytesOfSample();
 
         assertThat(assertTimeout(TestRules.GENEROUS_TIME_LIMIT, () -> analyzer.analyze(text)).findings()).isNotEmpty();
     }
@@ -205,7 +205,7 @@ class RiskAnalyzerTest {
 
     @Test
     void positionsPointAtTheMatchedText() {
-        String text = ContractFixtures.text("samples/sample-10k-excerpt.txt");
+        final String text = ContractFixtures.text("samples/sample-10k-excerpt.txt");
 
         assertThat(analyzer.analyze(text).findings()).allSatisfy(finding -> {
             assertThat(text.startsWith(finding.matchedText(), finding.position())).isTrue();
@@ -215,11 +215,11 @@ class RiskAnalyzerTest {
     }
 
     private static String twoMegabytesOfSample() {
-        String paragraph = ContractFixtures.text("samples/sample-10k-excerpt.txt");
+        final String paragraph = ContractFixtures.text("samples/sample-10k-excerpt.txt");
         return paragraph.repeat(TestRules.TWO_MB / paragraph.length() + 1).substring(0, TestRules.TWO_MB);
     }
 
-    private static FindingPayload toPayload(Finding finding) {
+    private static FindingPayload toPayload(final Finding finding) {
         return new FindingPayload(finding.category(), finding.severity(), finding.ruleId(),
                 finding.matchedText(), finding.excerpt(), finding.position());
     }

@@ -28,7 +28,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheEventsExchangeAsDurableTopic() {
-        TopicExchange exchange = config.eventsExchange();
+        final TopicExchange exchange = config.eventsExchange();
 
         assertThat(exchange.getName()).isEqualTo("veritrade.events");
         assertThat(exchange.getType()).isEqualTo(ExchangeTypes.TOPIC);
@@ -39,7 +39,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheDeadLetterExchangeAsDurableDirect() {
-        DirectExchange exchange = config.deadLetterExchange();
+        final DirectExchange exchange = config.deadLetterExchange();
 
         assertThat(exchange.getName()).isEqualTo("veritrade.dlx");
         assertThat(exchange.getType()).isEqualTo(ExchangeTypes.DIRECT);
@@ -49,7 +49,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheWorkQueueWithExactlyTheDeadLetterArguments() {
-        Queue queue = config.analysisEventsQueue();
+        final Queue queue = config.analysisEventsQueue();
 
         assertThat(queue.getName()).isEqualTo("ingestion.analysis-events");
         assertThat(queue.isDurable()).isTrue();
@@ -62,7 +62,7 @@ class RabbitConfigTest {
 
     @Test
     void declaresTheDeadLetterQueueWithoutArguments() {
-        Queue queue = config.analysisEventsDeadLetterQueue();
+        final Queue queue = config.analysisEventsDeadLetterQueue();
 
         assertThat(queue.getName()).isEqualTo("ingestion.analysis-events.dlq");
         assertThat(queue.isDurable()).isTrue();
@@ -73,7 +73,7 @@ class RabbitConfigTest {
 
     @Test
     void bindsTheWorkQueueToEveryAnalysisEvent() {
-        Binding binding = config.analysisEventsBinding(config.analysisEventsQueue(), config.eventsExchange());
+        final Binding binding = config.analysisEventsBinding(config.analysisEventsQueue(), config.eventsExchange());
 
         assertThat(binding.getDestination()).isEqualTo("ingestion.analysis-events");
         assertThat(binding.getExchange()).isEqualTo("veritrade.events");
@@ -82,7 +82,7 @@ class RabbitConfigTest {
 
     @Test
     void bindsTheDeadLetterQueueWithTheWorkQueueName() {
-        Binding binding = config.analysisEventsDeadLetterBinding(
+        final Binding binding = config.analysisEventsDeadLetterBinding(
                 config.analysisEventsDeadLetterQueue(), config.deadLetterExchange());
 
         assertThat(binding.getDestination()).isEqualTo("ingestion.analysis-events.dlq");
@@ -105,7 +105,7 @@ class RabbitConfigTest {
 
     @Test
     void retriesTransientFailures() {
-        Predicate<Throwable> retry = retryPredicate();
+        final Predicate<Throwable> retry = retryPredicate();
 
         assertThat(retry.test(new IllegalStateException("database down"))).isTrue();
         assertThat(retry.test(wrapped(new IllegalStateException("database down")))).isTrue();
@@ -113,7 +113,7 @@ class RabbitConfigTest {
 
     @Test
     void doesNotRetryInvalidEventsEvenWhenWrapped() {
-        Predicate<Throwable> retry = retryPredicate();
+        final Predicate<Throwable> retry = retryPredicate();
 
         assertThat(retry.test(new InvalidEventException("bad"))).isFalse();
         assertThat(retry.test(wrapped(new InvalidEventException("bad")))).isFalse();
@@ -127,12 +127,12 @@ class RabbitConfigTest {
     }
 
     private Predicate<Throwable> retryPredicate() {
-        RetryPolicySettings settings = new RetryPolicySettings();
+        final RetryPolicySettings settings = new RetryPolicySettings();
         config.noRetryForInvalidEvents().customize(settings);
         return settings.getExceptionPredicate();
     }
 
-    private static ListenerExecutionFailedException wrapped(Throwable cause) {
+    private static ListenerExecutionFailedException wrapped(final Throwable cause) {
         return new ListenerExecutionFailedException("Listener failed", cause, new Message(new byte[0]));
     }
 }

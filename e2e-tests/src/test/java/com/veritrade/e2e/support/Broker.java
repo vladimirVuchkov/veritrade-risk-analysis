@@ -39,38 +39,38 @@ public final class Broker {
             .version(HttpClient.Version.HTTP_1_1).connectTimeout(Timeouts.HTTP_REQUEST).build();
     private volatile URI endpoint;
 
-    public Broker(Supplier<URI> endpointLookup) {
+    public Broker(final Supplier<URI> endpointLookup) {
         this.endpointLookup = endpointLookup;
         this.endpoint = endpointLookup.get();
-        String user = System.getenv().getOrDefault("RABBITMQ_USERNAME", DEFAULT_CREDENTIAL);
-        String password = System.getenv().getOrDefault("RABBITMQ_PASSWORD", DEFAULT_CREDENTIAL);
+        final String user = System.getenv().getOrDefault("RABBITMQ_USERNAME", DEFAULT_CREDENTIAL);
+        final String password = System.getenv().getOrDefault("RABBITMQ_PASSWORD", DEFAULT_CREDENTIAL);
         this.authorization = "Basic " + Base64.getEncoder()
                 .encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
     }
 
     /** Publishes to {@code veritrade.events} and asserts that the broker routed the message to a queue. */
-    public void publish(String routingKey, String body, MessageProperties properties) {
-        ObjectNode request = Json.object();
+    public void publish(final String routingKey, final String body, final MessageProperties properties) {
+        final ObjectNode request = Json.object();
         request.put("routing_key", routingKey);
         request.put("payload", body);
         request.put("payload_encoding", "string");
         request.set("properties", properties.toJson(PERSISTENT));
-        JsonNode answer = send("POST", "/api/exchanges/" + VHOST + "/" + EVENTS_EXCHANGE + "/publish", request);
+        final JsonNode answer = send("POST", "/api/exchanges/" + VHOST + "/" + EVENTS_EXCHANGE + "/publish", request);
         assertThat(answer.path("routed").asBoolean()).as("message to %s routed", routingKey).isTrue();
     }
 
     /** Publishes an event with the AMQP properties a contract producer sets. */
-    public void publishEvent(JsonNode event) {
+    public void publishEvent(final JsonNode event) {
         publishEvent(event, MessageProperties.contract(event.path("eventId").asString(),
                 event.path("correlationId").asString()));
     }
 
     /** Publishes an event with its contract routing key and the given properties. */
-    public void publishEvent(JsonNode event, MessageProperties properties) {
+    public void publishEvent(final JsonNode event, final MessageProperties properties) {
         publish(Events.typeOf(event).routingKey(), Json.write(event), properties);
     }
 
-    public JsonNode queue(String name) {
+    public JsonNode queue(final String name) {
         return send("GET", "/api/queues/" + VHOST + "/" + name, null);
     }
 
@@ -78,11 +78,11 @@ public final class Broker {
         return send("GET", "/api/queues/" + VHOST, null);
     }
 
-    public JsonNode exchange(String name) {
+    public JsonNode exchange(final String name) {
         return send("GET", "/api/exchanges/" + VHOST + "/" + name, null);
     }
 
-    public JsonNode bindingsFrom(String exchange) {
+    public JsonNode bindingsFrom(final String exchange) {
         return send("GET", "/api/exchanges/" + VHOST + "/" + exchange + "/bindings/source", null);
     }
 
@@ -91,62 +91,62 @@ public final class Broker {
     }
 
     /** Messages counted by the management statistics (refreshed every few seconds). */
-    public long messageCount(String queue) {
+    public long messageCount(final String queue) {
         return queue(queue).path("messages").asLong();
     }
 
     /** Every message of a queue without a consumer, read and requeued. Use only on dead-letter queues. */
-    public List<JsonNode> peek(String queue) {
-        ObjectNode request = Json.object();
+    public List<JsonNode> peek(final String queue) {
+        final ObjectNode request = Json.object();
         request.put("count", PEEK_COUNT);
         request.put("ackmode", "ack_requeue_true");
         request.put("encoding", "auto");
         request.put("truncate", PEEK_TRUNCATE_BYTES);
-        List<JsonNode> messages = new ArrayList<>();
+        final List<JsonNode> messages = new ArrayList<>();
         send("POST", "/api/queues/" + VHOST + "/" + queue + "/get", request).forEach(messages::add);
         return messages;
     }
 
     /** Messages of a dead-letter queue whose body or message id contains the token. */
-    public List<JsonNode> peekMatching(String queue, String token) {
+    public List<JsonNode> peekMatching(final String queue, final String token) {
         return peek(queue).stream()
                 .filter(message -> message.path("payload").asString().contains(token)
                         || message.path("properties").path("message_id").asString("").contains(token))
                 .toList();
     }
 
-    public void purge(String queue) {
+    public void purge(final String queue) {
         send("DELETE", "/api/queues/" + VHOST + "/" + queue + "/contents", null);
     }
 
     /** A failed connection usually means the broker was restarted on a new host port: look it up and try again. */
-    private JsonNode send(String method, String path, JsonNode body) {
+    private JsonNode send(final String method, final String path, final JsonNode body) {
         try {
             return sendOnce(method, path, body);
-        } catch (IOException firstFailure) {
+        } catch (final IOException firstFailure) {
             endpoint = endpointLookup.get();
             try {
                 return sendOnce(method, path, body);
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 e.addSuppressed(firstFailure);
                 throw new UncheckedIOException(e);
             }
         }
     }
 
-    private JsonNode sendOnce(String method, String path, JsonNode body) throws IOException {
-        HttpRequest request = HttpRequest.newBuilder(endpoint.resolve(path))
+    private JsonNode sendOnce(final String method, final String path, final JsonNode body) throws IOException {
+        final HttpRequest request = HttpRequest.newBuilder(endpoint.resolve(path))
                 .timeout(Timeouts.HTTP_REQUEST)
                 .header("Authorization", authorization)
                 .header("Content-Type", "application/json")
                 .method(method, body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(Json.write(body)))
                 .build();
         try {
-            var response = client.send(request, BodyHandlers.ofString());
+            final var response = client.send(request, BodyHandlers.ofString());
             assertThat(response.statusCode() / STATUS_CLASS).as("%s %s: %s", method, path, response.body())
                     .isEqualTo(SUCCESS_CLASS);
             return response.body().isEmpty() ? Json.object() : Json.parse(response.body());
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }

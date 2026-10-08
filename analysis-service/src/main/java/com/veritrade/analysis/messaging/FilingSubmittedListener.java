@@ -29,8 +29,8 @@ public class FilingSubmittedListener {
     private final AnalysisEventFactory events;
     private final AnalysisEventPublisher publisher;
 
-    public FilingSubmittedListener(FilingSubmittedReader reader, RiskAnalyzer analyzer,
-            AnalysisEventFactory events, AnalysisEventPublisher publisher) {
+    public FilingSubmittedListener(final FilingSubmittedReader reader, final RiskAnalyzer analyzer,
+            final AnalysisEventFactory events, final AnalysisEventPublisher publisher) {
         this.reader = reader;
         this.analyzer = analyzer;
         this.events = events;
@@ -38,18 +38,18 @@ public class FilingSubmittedListener {
     }
 
     @RabbitListener(queues = MessagingTopology.Q_ANALYSIS_FILING_SUBMITTED)
-    public void onFilingSubmitted(Message message) {
-        EventEnvelope<FilingSubmittedPayload> event = reader.read(message);
+    public void onFilingSubmitted(final Message message) {
+        final EventEnvelope<FilingSubmittedPayload> event = reader.read(message);
         try (MDC.MDCCloseable ignored = MDC.putCloseable(CorrelationIds.MDC_KEY, event.correlationId())) {
             analyze(event, Boolean.TRUE.equals(message.getMessageProperties().getRedelivered()));
         }
     }
 
-    private void analyze(EventEnvelope<FilingSubmittedPayload> event, boolean redelivered) {
-        UUID filingId = event.payload().filingId();
+    private void analyze(final EventEnvelope<FilingSubmittedPayload> event, final boolean redelivered) {
+        final UUID filingId = event.payload().filingId();
         log.info("Analysing filing {} (event {}, redelivered {})", filingId, event.eventId(), redelivered);
         publisher.publish(events.started(filingId, event.correlationId()));
-        AnalysisResult result = analyzer.analyze(event.payload().content());
+        final AnalysisResult result = analyzer.analyze(event.payload().content());
         publisher.publish(events.completed(filingId, event.correlationId(), result));
         log.info("Filing {} analysed: {} findings, overall risk {}",
                 filingId, result.totalFindings(), result.overallRiskLevel());

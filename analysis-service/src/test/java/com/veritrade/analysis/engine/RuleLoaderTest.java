@@ -29,7 +29,7 @@ class RuleLoaderTest {
 
     @Test
     void bundledRulesHaveAtLeastTwentyRulesCoveringEveryCategory() {
-        RuleSet rules = TestRules.bundledRules();
+        final RuleSet rules = TestRules.bundledRules();
 
         assertThat(rules.rulesVersion()).isEqualTo("1.1");
         assertThat(rules.rules()).hasSizeGreaterThanOrEqualTo(20);
@@ -40,10 +40,10 @@ class RuleLoaderTest {
 
     @Test
     void loadsAValidRuleWithCaseInsensitivePatterns() {
-        RuleSet rules = TestRules.load("rulesVersion: \"2.1\"\nrules:\n" + VALID_RULE);
+        final RuleSet rules = TestRules.load("rulesVersion: \"2.1\"\nrules:\n" + VALID_RULE);
 
         assertThat(rules.rulesVersion()).isEqualTo("2.1");
-        RiskRule rule = rules.rules().getFirst();
+        final RiskRule rule = rules.rules().getFirst();
         assertThat(rule.id()).isEqualTo("LEGAL-001");
         assertThat(rule.category()).isEqualTo(RiskCategory.LEGAL);
         assertThat(rule.severity()).isEqualTo(Severity.HIGH);
@@ -53,7 +53,7 @@ class RuleLoaderTest {
 
     @Test
     void compilesSpacesAsWhitespaceRuns() {
-        RuleSet rules = TestRules.load("rulesVersion: \"1\"\nrules:\n" + VALID_RULE);
+        final RuleSet rules = TestRules.load("rulesVersion: \"1\"\nrules:\n" + VALID_RULE);
 
         assertThat(rules.rules().getFirst().patterns()).singleElement()
                 .satisfies(p -> assertThat(p.matcher("Pending\r\n\tlitigation").matches()).isTrue());
@@ -61,7 +61,7 @@ class RuleLoaderTest {
 
     @Test
     void keepsTheOrderOfRulesAndPatterns() {
-        RuleSet rules = TestRules.load("""
+        final RuleSet rules = TestRules.load("""
                 rulesVersion: "1"
                 rules:
                   - id: B-002
@@ -80,7 +80,7 @@ class RuleLoaderTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRuleFiles")
-    void refusesAnInvalidRulesFileWithAClearMessage(String problem, String yaml, String expectedMessage) {
+    void refusesAnInvalidRulesFileWithAClearMessage(final String problem, final String yaml, final String expectedMessage) {
         assertThatThrownBy(() -> TestRules.load(yaml))
                 .isInstanceOf(RuleValidationException.class)
                 .hasMessageContaining("Invalid risk rules in test.yml")
@@ -153,7 +153,7 @@ class RuleLoaderTest {
 
     @Test
     void reportsEveryProblemAtOnce() {
-        String yaml = rules(rule("LEGAL-001", "CLIMATE", "HIGH", "'ok1'")
+        final String yaml = rules(rule("LEGAL-001", "CLIMATE", "HIGH", "'ok1'")
                 + rule("LEGAL-002", "LEGAL", "SEVERE", "'bad ['"));
 
         assertThatThrownBy(() -> TestRules.load(yaml))
@@ -166,7 +166,7 @@ class RuleLoaderTest {
 
     @Test
     void namesTheSourceInTheMessage() {
-        ByteArrayInputStream in = new ByteArrayInputStream("rules: []".getBytes(StandardCharsets.UTF_8));
+        final ByteArrayInputStream in = new ByteArrayInputStream("rules: []".getBytes(StandardCharsets.UTF_8));
 
         assertThatThrownBy(() -> new RuleLoader().load(in, "class path resource [broken.yml]"))
                 .hasMessageStartingWith("Invalid risk rules in class path resource [broken.yml]:");
@@ -174,11 +174,11 @@ class RuleLoaderTest {
 
     @Test
     void everyCategoryAndSeverityNameIsAccepted() {
-        Set<String> loaded = new HashSet<>();
-        for (RiskCategory category : RiskCategory.values()) {
-            for (Severity severity : Severity.values()) {
-                String id = category.name() + "-00" + (severity.ordinal() + 1);
-                RuleSet set = TestRules.load(rules(rule(id, category.name(), severity.name(), "'x1'")));
+        final Set<String> loaded = new HashSet<>();
+        for (final RiskCategory category : RiskCategory.values()) {
+            for (final Severity severity : Severity.values()) {
+                final String id = category.name() + "-00" + (severity.ordinal() + 1);
+                final RuleSet set = TestRules.load(rules(rule(id, category.name(), severity.name(), "'x1'")));
                 loaded.add(set.rules().getFirst().category() + "/" + set.rules().getFirst().severity());
             }
         }
@@ -188,17 +188,17 @@ class RuleLoaderTest {
 
     @Test
     void enumNamesInMessagesAreTheContractNames() {
-        String categories = Arrays.stream(RiskCategory.values()).map(Enum::name).collect(Collectors.joining(", "));
+        final String categories = Arrays.stream(RiskCategory.values()).map(Enum::name).collect(Collectors.joining(", "));
 
         assertThatThrownBy(() -> TestRules.load(rules(rule("A-001", "X", "LOW", "'x1'"))))
                 .hasMessageContaining("expected one of [" + categories + "]");
     }
 
-    private static String rules(String ruleEntries) {
+    private static String rules(final String ruleEntries) {
         return "rulesVersion: \"1.0\"\nrules:\n" + ruleEntries;
     }
 
-    private static String rule(String id, String category, String severity, String pattern) {
+    private static String rule(final String id, final String category, final String severity, final String pattern) {
         return """
                   - id: %s
                     category: %s

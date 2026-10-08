@@ -36,13 +36,13 @@ class AnalysisFailureIT extends RabbitIntegrationTest {
     @Test
     void publishesAnalysisFailedAfterTheLastAttemptAndAcknowledges() {
         when(analyzer.analyze(anyString())).thenThrow(new IllegalStateException("rule engine error"));
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
 
         sendFilingSubmitted(filingSubmitted(filingId).toString());
 
-        List<Message> events = receiveEventsUntil(EventType.ANALYSIS_FAILED);
-        Message failed = events.getLast();
-        JsonNode failedEvent = json(failed);
+        final List<Message> events = receiveEventsUntil(EventType.ANALYSIS_FAILED);
+        final Message failed = events.getLast();
+        final JsonNode failedEvent = json(failed);
         assertThat(ContractFixtures.validate(EventType.ANALYSIS_FAILED, failedEvent)).isEmpty();
         assertThat(failed.getMessageProperties().getMessageId())
                 .isEqualTo(EventIds.forFiling(filingId, EventType.ANALYSIS_FAILED).toString());
@@ -60,23 +60,23 @@ class AnalysisFailureIT extends RabbitIntegrationTest {
 
     @Test
     void cutsALongReasonToTheSchemaLimitWithoutSplittingASurrogatePair() {
-        String fixedPart = REASON_PREFIX + "IllegalStateException: ";
-        String detail = "x".repeat(MessagingProperties.SCHEMA_MAX_REASON_LENGTH - fixedPart.length() - 1)
+        final String fixedPart = REASON_PREFIX + "IllegalStateException: ";
+        final String detail = "x".repeat(MessagingProperties.SCHEMA_MAX_REASON_LENGTH - fixedPart.length() - 1)
                 + EMOJI.repeat(MessagingProperties.SCHEMA_MAX_REASON_LENGTH);
         when(analyzer.analyze(anyString())).thenThrow(new IllegalStateException(detail));
 
         sendFilingSubmitted(filingSubmitted(UUID.randomUUID()).toString());
 
-        JsonNode failedEvent = json(receiveEventsUntil(EventType.ANALYSIS_FAILED).getLast());
-        String reason = failedEvent.get("payload").get("reason").asString();
+        final JsonNode failedEvent = json(receiveEventsUntil(EventType.ANALYSIS_FAILED).getLast());
+        final String reason = failedEvent.get("payload").get("reason").asString();
         assertThat(ContractFixtures.validate(EventType.ANALYSIS_FAILED, failedEvent)).isEmpty();
         assertThat(reason).hasSize(MessagingProperties.SCHEMA_MAX_REASON_LENGTH - 1)
                 .isEqualTo((fixedPart + detail).substring(0, MessagingProperties.SCHEMA_MAX_REASON_LENGTH - 1));
         assertNoMoreMessages(DEAD_LETTER_QUEUE);
     }
 
-    private long messageCount(String queue) {
-        QueueInformation info = admin.getQueueInfo(queue);
+    private long messageCount(final String queue) {
+        final QueueInformation info = admin.getQueueInfo(queue);
         return info == null ? 0 : info.getMessageCount();
     }
 }

@@ -31,20 +31,20 @@ class RiskScorerTest {
 
     @ParameterizedTest
     @EnumSource(Severity.class)
-    void aSingleFindingGivesItsOwnSeverity(Severity severity) {
+    void aSingleFindingGivesItsOwnSeverity(final Severity severity) {
         assertThat(scorer.score(findings(1, severity))).isEqualTo(RiskLevel.valueOf(severity.name()));
     }
 
     @Test
     void takesTheHighestSeverity() {
-        List<Finding> mixed = List.of(finding(Severity.LOW), finding(Severity.HIGH), finding(Severity.MEDIUM));
+        final List<Finding> mixed = List.of(finding(Severity.LOW), finding(Severity.HIGH), finding(Severity.MEDIUM));
 
         assertThat(scorer.score(mixed)).isEqualTo(RiskLevel.HIGH);
     }
 
     @ParameterizedTest(name = "{0} with {1} findings -> {2}")
     @MethodSource("thresholdBoundary")
-    void raisesOneLevelFromTheThresholdOn(Severity severity, int count, RiskLevel expected) {
+    void raisesOneLevelFromTheThresholdOn(final Severity severity, final int count, final RiskLevel expected) {
         assertThat(scorer.score(findings(count, severity))).isEqualTo(expected);
     }
 
@@ -71,7 +71,7 @@ class RiskScorerTest {
 
     @Test
     void countsFindingsOfEverySeverityTowardsTheThreshold() {
-        List<Finding> mixed = new ArrayList<>(findings(THRESHOLD - 1, Severity.LOW));
+        final List<Finding> mixed = new ArrayList<>(findings(THRESHOLD - 1, Severity.LOW));
         mixed.add(finding(Severity.MEDIUM));
 
         assertThat(scorer.score(mixed)).isEqualTo(RiskLevel.HIGH);
@@ -79,7 +79,7 @@ class RiskScorerTest {
 
     @ParameterizedTest
     @CsvSource({"LOW, MEDIUM", "MEDIUM, HIGH", "HIGH, CRITICAL", "CRITICAL, CRITICAL"})
-    void aThresholdOfOneRaisesEveryNonEmptyResult(Severity severity, RiskLevel expected) {
+    void aThresholdOfOneRaisesEveryNonEmptyResult(final Severity severity, final RiskLevel expected) {
         assertThat(new RiskScorer(1).score(findings(1, severity))).isEqualTo(expected);
     }
 
@@ -88,11 +88,11 @@ class RiskScorerTest {
         assertThatThrownBy(() -> new RiskScorer(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
-    private static List<Finding> findings(int count, Severity severity) {
+    private static List<Finding> findings(final int count, final Severity severity) {
         return IntStream.range(0, count).mapToObj(i -> finding(severity)).toList();
     }
 
-    private static Finding finding(Severity severity) {
+    private static Finding finding(final Severity severity) {
         return new Finding(RiskCategory.LEGAL, severity, "LEGAL-001", "text", "the text", 0);
     }
 }

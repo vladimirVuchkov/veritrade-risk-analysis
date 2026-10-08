@@ -22,16 +22,16 @@ class HappyPathE2E extends E2ETestBase {
 
     @Test
     void sampleFilingIsAnalysedAndReportedWithinTenSeconds() {
-        FilingRequest filing = system.demoFiling();
-        long started = System.nanoTime();
-        ApiResponse submitted = api.submit(filing.toJson(), Map.of());
-        UUID filingId = acceptedAsSubmitted(submitted);
+        final FilingRequest filing = system.demoFiling();
+        final long started = System.nanoTime();
+        final ApiResponse submitted = api.submit(filing.toJson(), Map.of());
+        final UUID filingId = acceptedAsSubmitted(submitted);
 
-        JsonNode report = api.awaitReport(filingId, Timeouts.REPORT_DEADLINE);
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
+        final JsonNode report = api.awaitReport(filingId, Timeouts.REPORT_DEADLINE);
+        final Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
 
         assertThat(elapsed).isLessThan(Timeouts.REPORT_DEADLINE);
-        JsonNode status = api.awaitStatus(filingId, "COMPLETED", Timeouts.REPORT_DEADLINE);
+        final JsonNode status = api.awaitStatus(filingId, "COMPLETED", Timeouts.REPORT_DEADLINE);
         Contracts.assertMatchesApiSchema("FilingStatusResponse", status);
         assertThat(status.path("companyName").asString()).isEqualTo(filing.companyName());
         assertThat(status.path("failureReason").isMissingNode() || status.path("failureReason").isNull()).isTrue();
@@ -43,10 +43,10 @@ class HappyPathE2E extends E2ETestBase {
 
     @Test
     void filingWithoutRiskTextCompletesWithNoFindings() {
-        UUID filingId = acceptedAsSubmitted(api.submit(FilingRequest.noRisk("No risk at all").toJson(), Map.of()));
+        final UUID filingId = acceptedAsSubmitted(api.submit(FilingRequest.noRisk("No risk at all").toJson(), Map.of()));
 
         api.awaitStatus(filingId, "COMPLETED");
-        JsonNode report = api.awaitReport(filingId);
+        final JsonNode report = api.awaitReport(filingId);
 
         Contracts.assertMatchesApiSchema("ReportResponse", report);
         assertThat(report.path("status").asString()).isEqualTo("COMPLETED");
@@ -57,17 +57,17 @@ class HappyPathE2E extends E2ETestBase {
         assertThat(report.path("findings").isEmpty()).isTrue();
     }
 
-    private static UUID acceptedAsSubmitted(ApiResponse submitted) {
+    private static UUID acceptedAsSubmitted(final ApiResponse submitted) {
         assertThat(submitted.status()).as(submitted.toString()).isEqualTo(ACCEPTED);
         Contracts.assertMatchesApiSchema("SubmitFilingResponse", submitted.json());
         assertThat(submitted.json().path("status").asString()).isEqualTo("SUBMITTED");
-        UUID filingId = UUID.fromString(submitted.json().path("filingId").asString());
+        final UUID filingId = UUID.fromString(submitted.json().path("filingId").asString());
         assertThat(submitted.header("Location")).hasValue("/api/filings/" + filingId);
         return filingId;
     }
 
     /** The two transitions are too fast to catch by polling, so Ingestion's log is the evidence. */
-    private static void assertWentThroughAnalyzing(UUID filingId) {
+    private static void assertWentThroughAnalyzing(final UUID filingId) {
         system.awaitLogLine(ComposeStack.INGESTION, "Filing " + filingId + " moved from SUBMITTED to ANALYZING");
         system.awaitLogLine(ComposeStack.INGESTION, "Filing " + filingId + " moved from ANALYZING to COMPLETED");
     }

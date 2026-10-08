@@ -41,17 +41,17 @@ class LargeFilingE2E extends E2ETestBase {
         assertAnalysedUpToTheLastByte(contentOfExactly(MAX_CONTENT_BYTES, MULTIBYTE_FILLER));
     }
 
-    private static void assertAnalysedUpToTheLastByte(String content) {
+    private static void assertAnalysedUpToTheLastByte(final String content) {
         assertThat(utf8Bytes(content)).isEqualTo(MAX_CONTENT_BYTES);
-        FilingRequest filing = FilingRequest.noRisk("Large filing " + UUID.randomUUID()).withContent(content);
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = FilingRequest.noRisk("Large filing " + UUID.randomUUID()).withContent(content);
+        final UUID filingId = api.submitAccepted(filing);
 
-        JsonNode status = api.awaitStatus(filingId, "COMPLETED", Timeouts.LARGE_FILING_PROCESSING);
+        final JsonNode status = api.awaitStatus(filingId, "COMPLETED", Timeouts.LARGE_FILING_PROCESSING);
         Contracts.assertMatchesApiSchema("FilingStatusResponse", status);
-        JsonNode report = api.awaitReport(filingId, Timeouts.LARGE_FILING_PROCESSING);
+        final JsonNode report = api.awaitReport(filingId, Timeouts.LARGE_FILING_PROCESSING);
 
         ReportAssertions.assertConsistentCompletedReport(report, content);
-        List<JsonNode> findings = ReportAssertions.findings(report);
+        final List<JsonNode> findings = ReportAssertions.findings(report);
         assertThat(findings).extracting(finding -> finding.path("ruleId").asString())
                 .containsExactlyInAnyOrderElementsOf(EXPECTED_RULE_IDS);
         assertThat(findings).anySatisfy(finding -> {
@@ -62,21 +62,21 @@ class LargeFilingE2E extends E2ETestBase {
     }
 
     /** START_PHRASE, filler, MIDDLE_PHRASE halfway, filler, END_PHRASE as the last bytes. */
-    private static String contentOfExactly(int bytes, String filler) {
-        String head = START_PHRASE + " ";
-        String middle = " " + MIDDLE_PHRASE + " ";
-        String tail = " " + END_PHRASE;
-        int padding = bytes - utf8Bytes(head) - utf8Bytes(middle) - utf8Bytes(tail);
-        int firstHalf = padding / 2;
+    private static String contentOfExactly(final int bytes, final String filler) {
+        final String head = START_PHRASE + " ";
+        final String middle = " " + MIDDLE_PHRASE + " ";
+        final String tail = " " + END_PHRASE;
+        final int padding = bytes - utf8Bytes(head) - utf8Bytes(middle) - utf8Bytes(tail);
+        final int firstHalf = padding / 2;
         return head + padding(firstHalf, filler) + middle + padding(padding - firstHalf, filler) + tail;
     }
 
-    private static String padding(int bytes, String filler) {
-        int copies = bytes / utf8Bytes(filler);
+    private static String padding(final int bytes, final String filler) {
+        final int copies = bytes / utf8Bytes(filler);
         return filler.repeat(copies) + BYTE_FILLER.repeat(bytes - copies * utf8Bytes(filler));
     }
 
-    private static int utf8Bytes(String text) {
+    private static int utf8Bytes(final String text) {
         return text.getBytes(StandardCharsets.UTF_8).length;
     }
 }

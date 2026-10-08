@@ -32,16 +32,16 @@ class FailedAnalysisRecovererTest {
 
     @Test
     void publishesAnalysisFailedAfterAProcessingFailureAndReturnsNormally() {
-        UUID filingId = UUID.randomUUID();
-        Message message = message(filingSubmitted(filingId));
+        final UUID filingId = UUID.randomUUID();
+        final Message message = message(filingSubmitted(filingId));
 
         recoverer.recover(message, listenerFailure(message, new IllegalStateException("rule engine error")));
 
-        EventEnvelope<?> failed = publishedEvent();
+        final EventEnvelope<?> failed = publishedEvent();
         assertThat(failed.eventType()).isEqualTo(EventType.ANALYSIS_FAILED);
         assertThat(failed.eventId()).isEqualTo(EventIds.forFiling(filingId, EventType.ANALYSIS_FAILED));
         assertThat(failed.correlationId()).isEqualTo("c0a8012e-5b1f-4d3c-8e2a-7f6b9d4c1a20");
-        AnalysisFailedPayload payload = (AnalysisFailedPayload) failed.payload();
+        final AnalysisFailedPayload payload = (AnalysisFailedPayload) failed.payload();
         assertThat(payload.filingId()).isEqualTo(filingId);
         assertThat(payload.reason())
                 .isEqualTo("Analysis failed after all retries: IllegalStateException: rule engine error");
@@ -49,7 +49,7 @@ class FailedAnalysisRecovererTest {
 
     @Test
     void namesTheExceptionTypeWhenTheFailureHasNoMessage() {
-        Message message = message(filingSubmitted(UUID.randomUUID()));
+        final Message message = message(filingSubmitted(UUID.randomUUID()));
 
         recoverer.recover(message, listenerFailure(message, new NullPointerException()));
 
@@ -59,8 +59,8 @@ class FailedAnalysisRecovererTest {
 
     @Test
     void reportsAPublishFailureOfTheCompletedEventAsTheReason() {
-        Message message = message(filingSubmitted(UUID.randomUUID()));
-        EventEnvelope<?> event = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING).started(UUID.randomUUID(), "c");
+        final Message message = message(filingSubmitted(UUID.randomUUID()));
+        final EventEnvelope<?> event = new AnalysisEventFactory(Clock.systemUTC(), TestMessages.MESSAGING).started(UUID.randomUUID(), "c");
 
         recoverer.recover(message, listenerFailure(message, new EventPublishException(event, "no confirm")));
 
@@ -69,7 +69,7 @@ class FailedAnalysisRecovererTest {
 
     @Test
     void rejectsAnInvalidMessageToTheDeadLetterQueueWithoutPublishing() {
-        Message poison = message("{not json", false);
+        final Message poison = message("{not json", false);
 
         assertThatThrownBy(() -> recoverer.recover(poison,
                 listenerFailure(poison, new InvalidFilingMessageException("Unreadable message body"))))
@@ -79,7 +79,7 @@ class FailedAnalysisRecovererTest {
 
     @Test
     void deadLettersTheMessageWhenAnalysisFailedCannotBePublished() {
-        Message message = message(filingSubmitted(UUID.randomUUID()));
+        final Message message = message(filingSubmitted(UUID.randomUUID()));
         doThrow(new IllegalStateException("broker down")).when(publisher).publish(any());
 
         assertThatThrownBy(() -> recoverer.recover(message, listenerFailure(message, new IllegalStateException("x"))))
@@ -89,12 +89,12 @@ class FailedAnalysisRecovererTest {
 
     private EventEnvelope<?> publishedEvent() {
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<EventEnvelope<?>> captor = ArgumentCaptor.forClass(EventEnvelope.class);
+        final ArgumentCaptor<EventEnvelope<?>> captor = ArgumentCaptor.forClass(EventEnvelope.class);
         verify(publisher).publish(captor.capture());
         return captor.getValue();
     }
 
-    private static ListenerExecutionFailedException listenerFailure(Message message, Throwable cause) {
+    private static ListenerExecutionFailedException listenerFailure(final Message message, final Throwable cause) {
         return new ListenerExecutionFailedException("Listener threw exception", cause, message);
     }
 }

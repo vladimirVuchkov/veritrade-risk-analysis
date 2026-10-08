@@ -56,12 +56,12 @@ public class RabbitConfig {
     }
 
     @Bean
-    Binding analysisEventsBinding(Queue analysisEventsQueue, TopicExchange eventsExchange) {
+    Binding analysisEventsBinding(final Queue analysisEventsQueue, final TopicExchange eventsExchange) {
         return BindingBuilder.bind(analysisEventsQueue).to(eventsExchange).with(RK_ANALYSIS_ALL);
     }
 
     @Bean
-    Binding analysisEventsDeadLetterBinding(Queue analysisEventsDeadLetterQueue, DirectExchange deadLetterExchange) {
+    Binding analysisEventsDeadLetterBinding(final Queue analysisEventsDeadLetterQueue, final DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(analysisEventsDeadLetterQueue).to(deadLetterExchange).with(Q_INGESTION_ANALYSIS_EVENTS);
     }
 

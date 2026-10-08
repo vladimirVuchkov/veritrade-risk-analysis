@@ -52,7 +52,7 @@ public class OutboxEvent {
     protected OutboxEvent() {
     }
 
-    public OutboxEvent(UUID id, String routingKey, String correlationId, String payload, Instant createdAt) {
+    public OutboxEvent(final UUID id, final String routingKey, final String correlationId, final String payload, final Instant createdAt) {
         this.id = Objects.requireNonNull(id, "id");
         this.routingKey = Objects.requireNonNull(routingKey, "routingKey");
         this.correlationId = Objects.requireNonNull(correlationId, "correlationId");

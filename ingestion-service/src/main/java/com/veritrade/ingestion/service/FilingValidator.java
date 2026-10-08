@@ -17,14 +17,14 @@ public class FilingValidator {
 
     private final IngestionProperties.FilingLimits limits;
 
-    public FilingValidator(IngestionProperties properties) {
+    public FilingValidator(final IngestionProperties properties) {
         this.limits = properties.filing();
     }
 
-    public FilingSubmission validate(FilingSubmission submission) {
-        List<String> errors = new ArrayList<>();
-        String companyName = checkText("companyName", submission.companyName(), limits.maxCompanyNameLength(), errors);
-        String title = checkText("title", submission.title(), limits.maxTitleLength(), errors);
+    public FilingSubmission validate(final FilingSubmission submission) {
+        final List<String> errors = new ArrayList<>();
+        final String companyName = checkText("companyName", submission.companyName(), limits.maxCompanyNameLength(), errors);
+        final String title = checkText("title", submission.title(), limits.maxTitleLength(), errors);
         checkContent(submission.content(), errors);
         if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
@@ -32,24 +32,24 @@ public class FilingValidator {
         return new FilingSubmission(companyName, title, submission.content());
     }
 
-    private static String checkText(String field, String value, int maxLength, List<String> errors) {
+    private static String checkText(final String field, final String value, final int maxLength, final List<String> errors) {
         if (value == null || value.isBlank()) {
             errors.add(field + " must not be blank");
             return value;
         }
-        String stripped = value.strip();
+        final String stripped = value.strip();
         if (stripped.length() > maxLength) {
             errors.add(field + " must be at most " + maxLength + " characters");
         }
         return stripped;
     }
 
-    private void checkContent(String content, List<String> errors) {
+    private void checkContent(final String content, final List<String> errors) {
         if (content == null || content.isBlank()) {
             errors.add("content must not be blank");
             return;
         }
-        int bytes = content.getBytes(StandardCharsets.UTF_8).length;
+        final int bytes = content.getBytes(StandardCharsets.UTF_8).length;
         if (bytes > limits.maxContentBytes()) {
             errors.add("content must be at most " + limits.maxContentBytes() + " bytes of UTF-8 (was " + bytes + ")");
         }

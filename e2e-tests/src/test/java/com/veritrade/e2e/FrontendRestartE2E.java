@@ -24,7 +24,7 @@ class FrontendRestartE2E extends E2ETestBase {
         stack.start(ComposeStack.FRONTEND);
 
         assertThat(api.get(Api.FILINGS + "?limit=1").status()).isEqualTo(OK);
-        UUID filingId = api.submitAccepted(FilingRequest.noRisk("After nginx restart " + UUID.randomUUID()));
+        final UUID filingId = api.submitAccepted(FilingRequest.noRisk("After nginx restart " + UUID.randomUUID()));
         api.awaitStatus(filingId, "COMPLETED");
     }
 }

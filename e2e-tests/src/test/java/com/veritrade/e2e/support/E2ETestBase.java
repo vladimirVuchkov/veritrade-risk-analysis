@@ -14,7 +14,7 @@ public abstract class E2ETestBase {
     protected static ComposeStack stack;
 
     @BeforeAll
-    static void attach(TestSystem testSystem) {
+    static void attach(final TestSystem testSystem) {
         system = testSystem;
         api = testSystem.api();
         broker = testSystem.broker();
@@ -22,7 +22,7 @@ public abstract class E2ETestBase {
     }
 
     /** A correlation id that names the test, so its log lines are easy to find. */
-    protected static String correlationId(String scenario) {
+    protected static String correlationId(final String scenario) {
         return "e2e-" + scenario + "-" + UUID.randomUUID();
     }
 }

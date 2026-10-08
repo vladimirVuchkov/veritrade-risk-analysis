@@ -26,59 +26,59 @@ public class AnalysisEventReader {
     private final JsonMapper jsonMapper;
     private final AnalysisEventValidator validator;
 
-    public AnalysisEventReader(JsonMapper jsonMapper, AnalysisEventValidator validator) {
+    public AnalysisEventReader(final JsonMapper jsonMapper, final AnalysisEventValidator validator) {
         this.jsonMapper = jsonMapper;
         this.validator = validator;
     }
 
-    public EventEnvelope<?> read(Message message) {
-        ObjectNode tree = parseObject(message.getBody());
-        EventType type = eventType(tree, message.getMessageProperties().getReceivedRoutingKey());
+    public EventEnvelope<?> read(final Message message) {
+        final ObjectNode tree = parseObject(message.getBody());
+        final EventType type = eventType(tree, message.getMessageProperties().getReceivedRoutingKey());
         tree.put(EVENT_TYPE_FIELD, type.name());
-        EventEnvelope<?> envelope = toEnvelope(tree, type);
+        final EventEnvelope<?> envelope = toEnvelope(tree, type);
         validator.validate(envelope);
         return envelope;
     }
 
-    private ObjectNode parseObject(byte[] body) {
+    private ObjectNode parseObject(final byte[] body) {
         try {
-            JsonNode tree = jsonMapper.readTree(body);
+            final JsonNode tree = jsonMapper.readTree(body);
             if (tree instanceof ObjectNode object) {
                 return object;
             }
-        } catch (JacksonException e) {
+        } catch (final JacksonException e) {
             throw new InvalidEventException("Message body is not valid JSON", e);
         }
         throw new InvalidEventException("Message body is not a JSON object");
     }
 
-    private static EventType eventType(ObjectNode tree, String routingKey) {
-        JsonNode field = tree.get(EVENT_TYPE_FIELD);
-        EventType type = field == null || field.isNull() ? fromRoutingKey(routingKey) : fromName(field.asString());
+    private static EventType eventType(final ObjectNode tree, final String routingKey) {
+        final JsonNode field = tree.get(EVENT_TYPE_FIELD);
+        final EventType type = field == null || field.isNull() ? fromRoutingKey(routingKey) : fromName(field.asString());
         if (!SUPPORTED.contains(type)) {
             throw new InvalidEventException("Event type not consumed by Reporting: " + type);
         }
         return type;
     }
 
-    private static EventType fromName(String name) {
+    private static EventType fromName(final String name) {
         try {
             return EventType.valueOf(name);
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
             throw new InvalidEventException("Unknown eventType: " + name, e);
         }
     }
 
-    private static EventType fromRoutingKey(String routingKey) {
+    private static EventType fromRoutingKey(final String routingKey) {
         try {
             return EventType.fromRoutingKey(routingKey);
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
             throw new InvalidEventException("No eventType and unknown routing key: " + routingKey, e);
         }
     }
 
-    private EventEnvelope<?> toEnvelope(ObjectNode tree, EventType type) {
-        JavaType envelopeType = jsonMapper.getTypeFactory()
+    private EventEnvelope<?> toEnvelope(final ObjectNode tree, final EventType type) {
+        final JavaType envelopeType = jsonMapper.getTypeFactory()
                 .constructParametricType(EventEnvelope.class, type.payloadType());
         try {
             return jsonMapper.readerFor(envelopeType)
@@ -86,7 +86,7 @@ public class AnalysisEventReader {
                     .with(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
                     .with(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
                     .readValue(tree);
-        } catch (JacksonException e) {
+        } catch (final JacksonException e) {
             throw new InvalidEventException("Event does not match the " + type + " contract", e);
         }
     }

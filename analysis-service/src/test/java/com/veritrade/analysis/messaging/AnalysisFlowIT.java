@@ -53,15 +53,15 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void publishesStartedAndCompletedThatMatchTheSchemas() {
-        UUID filingId = UUID.randomUUID();
+        final UUID filingId = UUID.randomUUID();
 
         sendFilingSubmitted(filingSubmitted(filingId).toString());
 
-        Message started = receive(CAPTURE_QUEUE);
-        Message completed = receive(CAPTURE_QUEUE);
+        final Message started = receive(CAPTURE_QUEUE);
+        final Message completed = receive(CAPTURE_QUEUE);
         assertEvent(started, EventType.ANALYSIS_STARTED, filingId);
         assertEvent(completed, EventType.ANALYSIS_COMPLETED, filingId);
-        JsonNode summary = json(completed).get("payload").get("summary");
+        final JsonNode summary = json(completed).get("payload").get("summary");
         assertThat(summary.get("totalFindings").asInt()).isEqualTo(3);
         assertThat(summary.get("overallRiskLevel").asString()).isEqualTo("HIGH");
         assertNoMoreMessages(CAPTURE_QUEUE);
@@ -72,9 +72,9 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
         sendFilingSubmitted(ContractFixtures.example(EventType.FILING_SUBMITTED).toString());
 
         receive(CAPTURE_QUEUE);
-        JsonNode completed = json(receive(CAPTURE_QUEUE));
+        final JsonNode completed = json(receive(CAPTURE_QUEUE));
 
-        JsonNode expected = ContractFixtures.example(EventType.ANALYSIS_COMPLETED);
+        final JsonNode expected = ContractFixtures.example(EventType.ANALYSIS_COMPLETED);
         assertThat(completed.get("eventId")).isEqualTo(expected.get("eventId"));
         assertThat(completed.get("payload").get("findings")).isEqualTo(expected.get("payload").get("findings"));
         assertThat(completed.get("payload").get("summary")).isEqualTo(expected.get("payload").get("summary"));
@@ -85,7 +85,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
     void sendsAnUnreadableMessageToTheDeadLetterQueueWithoutRetries() {
         sendFilingSubmitted("{\"eventType\": \"FILING_SUBMITTED\", \"payload\": {broken");
 
-        Message dead = receive(DEAD_LETTER_QUEUE);
+        final Message dead = receive(DEAD_LETTER_QUEUE);
 
         assertThat(new String(dead.getBody())).contains("broken");
         assertRejectedOnce(dead);
@@ -96,7 +96,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void sendsAnEventWithMissingFieldsToTheDeadLetterQueueWithoutRetries() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         ((ObjectNode) event.get("payload")).remove("content");
 
         sendFilingSubmitted(event.toString());
@@ -109,12 +109,12 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void sendsANewerEventVersionToTheDeadLetterQueueWithoutRetriesOrEvents() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
 
         sendFilingSubmitted(event.toString());
 
-        Message dead = receive(DEAD_LETTER_QUEUE);
+        final Message dead = receive(DEAD_LETTER_QUEUE);
         assertThat(json(dead)).isEqualTo(event);
         assertRejectedOnce(dead);
         verify(listener, times(1)).onFilingSubmitted(any());
@@ -124,7 +124,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void sendsAWrongEventTypeToTheDeadLetterQueue() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("eventType", "ANALYSIS_COMPLETED");
 
         sendFilingSubmitted(event.toString());
@@ -135,12 +135,12 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void aDuplicateDeliveryRepublishesEventsWithTheSameIds() {
-        String body = filingSubmitted(UUID.randomUUID()).toString();
+        final String body = filingSubmitted(UUID.randomUUID()).toString();
 
         sendFilingSubmitted(body);
-        List<Message> first = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
+        final List<Message> first = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
         sendFilingSubmitted(body);
-        List<Message> second = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
+        final List<Message> second = List.of(receive(CAPTURE_QUEUE), receive(CAPTURE_QUEUE));
 
         assertThat(second).extracting(m -> m.getMessageProperties().getMessageId())
                 .isEqualTo(first.stream().map(m -> m.getMessageProperties().getMessageId()).toList());
@@ -150,7 +150,7 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @Test
     void ignoresUnknownFieldsInTheIncomingEvent() {
-        ObjectNode event = filingSubmitted(UUID.randomUUID());
+        final ObjectNode event = filingSubmitted(UUID.randomUUID());
         event.put("addedLater", true);
         ((ObjectNode) event.get("payload")).put("industry", "Retail");
 
@@ -162,8 +162,8 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"com.veritrade.contracts.event.EventEnvelope", "java.lang.Runtime", "com.example.Missing"})
-    void ignoresAJavaTypeHeaderOnAValidFiling(String typeId) {
-        UUID filingId = UUID.randomUUID();
+    void ignoresAJavaTypeHeaderOnAValidFiling(final String typeId) {
+        final UUID filingId = UUID.randomUUID();
 
         sendFilingSubmitted(filingSubmitted(filingId).toString(), Map.of(TYPE_ID_HEADER, typeId));
 
@@ -179,10 +179,10 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
         assertThat(rabbitTemplate.getMessageConverter()).isInstanceOf(JacksonJsonMessageConverter.class);
     }
 
-    private static void assertEvent(Message message, EventType type, UUID filingId) {
-        JsonNode event = json(message);
-        MessageProperties properties = message.getMessageProperties();
-        String eventId = EventIds.forFiling(filingId, type).toString();
+    private static void assertEvent(final Message message, final EventType type, final UUID filingId) {
+        final JsonNode event = json(message);
+        final MessageProperties properties = message.getMessageProperties();
+        final String eventId = EventIds.forFiling(filingId, type).toString();
         assertThat(ContractFixtures.validate(type, event)).isEmpty();
         assertThat(event.get("eventType").asString()).isEqualTo(type.name());
         assertThat(event.get("eventId").asString()).isEqualTo(eventId);
@@ -195,8 +195,8 @@ class AnalysisFlowIT extends RabbitIntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static void assertRejectedOnce(Message dead) {
-        List<Map<String, Object>> deaths = (List<Map<String, Object>>) dead.getMessageProperties().getHeaders().get("x-death");
+    private static void assertRejectedOnce(final Message dead) {
+        final List<Map<String, Object>> deaths = (List<Map<String, Object>>) dead.getMessageProperties().getHeaders().get("x-death");
         assertThat(deaths).singleElement().satisfies(death -> {
             assertThat(death.get("queue")).isEqualTo(MessagingTopology.Q_ANALYSIS_FILING_SUBMITTED);
             assertThat(death.get("reason")).isEqualTo("rejected");

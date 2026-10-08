@@ -28,7 +28,7 @@ final class PublishFailures {
     private PublishFailures() {
     }
 
-    static boolean isCausedByTheMessage(RuntimeException failure) {
+    static boolean isCausedByTheMessage(final RuntimeException failure) {
         if (isConnectionFailure(failure)) {
             return false;
         }
@@ -40,7 +40,7 @@ final class PublishFailures {
         return false;
     }
 
-    private static boolean isConnectionFailure(RuntimeException failure) {
+    private static boolean isConnectionFailure(final RuntimeException failure) {
         return failure instanceof AmqpConnectException
                 || failure instanceof AmqpIOException
                 || failure instanceof AmqpTimeoutException

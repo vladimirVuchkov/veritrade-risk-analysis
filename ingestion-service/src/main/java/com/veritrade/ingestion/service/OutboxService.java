@@ -28,7 +28,7 @@ public class OutboxService {
     private final int batchSize;
     private final int maxAttempts;
 
-    public OutboxService(OutboxRepository outbox, JsonMapper jsonMapper, Clock clock, IngestionProperties properties) {
+    public OutboxService(final OutboxRepository outbox, final JsonMapper jsonMapper, final Clock clock, final IngestionProperties properties) {
         this.outbox = outbox;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
@@ -38,8 +38,8 @@ public class OutboxService {
 
     /** Must run inside the transaction that changes the business data, so both commit or neither does. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void enqueue(EventEnvelope<?> envelope) {
-        String payload = jsonMapper.writeValueAsString(envelope);
+    public void enqueue(final EventEnvelope<?> envelope) {
+        final String payload = jsonMapper.writeValueAsString(envelope);
         outbox.save(new OutboxEvent(envelope.eventId(), envelope.eventType().routingKey(),
                 envelope.correlationId(), payload, envelope.occurredAt()));
     }
@@ -50,7 +50,7 @@ public class OutboxService {
     }
 
     @Transactional
-    public void markPublished(UUID eventId) {
+    public void markPublished(final UUID eventId) {
         outbox.markPublished(eventId, now());
     }
 
@@ -59,7 +59,7 @@ public class OutboxService {
      * {@code ingestion.outbox.max-attempts} times. Returns true when the row is parked now.
      */
     @Transactional
-    public boolean recordFailedAttempt(UUID eventId, String error) {
+    public boolean recordFailedAttempt(final UUID eventId, final String error) {
         outbox.recordFailedAttempt(eventId, shorten(error));
         return outbox.parkIfExhausted(eventId, maxAttempts, now()) == 1;
     }
@@ -72,7 +72,7 @@ public class OutboxService {
         return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
-    private static String shorten(String error) {
+    private static String shorten(final String error) {
         return error.length() <= OutboxEvent.LAST_ERROR_LENGTH ? error : error.substring(0, OutboxEvent.LAST_ERROR_LENGTH);
     }
 }

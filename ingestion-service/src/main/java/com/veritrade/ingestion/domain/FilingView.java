@@ -12,7 +12,7 @@ public record FilingView(
         Instant submittedAt,
         String failureReason) {
 
-    public static FilingView of(Filing filing) {
+    public static FilingView of(final Filing filing) {
         return new FilingView(filing.id(), filing.companyName(), filing.title(), filing.status(),
                 filing.submittedAt(), filing.failureReason());
     }

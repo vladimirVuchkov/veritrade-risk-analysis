@@ -9,7 +9,7 @@ public record Match(int start, int end) {
         }
     }
 
-    boolean overlaps(Match other) {
+    boolean overlaps(final Match other) {
         return start < other.end && other.start < end;
     }
 }

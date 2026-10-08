@@ -63,7 +63,7 @@ class AnalysisResultListenerTest {
 
     @Test
     void putsTheEnvelopeCorrelationIdInTheLoggingContextAndClearsItAfterwards() {
-        AtomicReference<String> seen = new AtomicReference<>();
+        final AtomicReference<String> seen = new AtomicReference<>();
         when(reportService.recordCompleted(any(), any())).thenAnswer(invocation -> {
             seen.set(MDC.get(CorrelationIds.MDC_KEY));
             return RecordOutcome.CREATED;
@@ -77,7 +77,7 @@ class AnalysisResultListenerTest {
 
     @Test
     void clearsTheLoggingContextWhenTheMessageIsInvalid() {
-        Message poison = message("{oops", MessagingTopology.RK_ANALYSIS_COMPLETED);
+        final Message poison = message("{oops", MessagingTopology.RK_ANALYSIS_COMPLETED);
 
         assertThatThrownBy(() -> listener.onMessage(poison)).isInstanceOf(InvalidEventException.class);
 
@@ -88,7 +88,7 @@ class AnalysisResultListenerTest {
     @Test
     void propagatesAProcessingFailureSoTheListenerRetryRuns() {
         when(reportService.recordCompleted(any(), any())).thenThrow(new IllegalStateException("database down"));
-        Message message = message(example(COMPLETED_EXAMPLE), MessagingTopology.RK_ANALYSIS_COMPLETED);
+        final Message message = message(example(COMPLETED_EXAMPLE), MessagingTopology.RK_ANALYSIS_COMPLETED);
 
         assertThatThrownBy(() -> listener.onMessage(message))
                 .isInstanceOf(IllegalStateException.class)

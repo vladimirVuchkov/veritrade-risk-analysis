@@ -25,7 +25,7 @@ class StaticUiE2E extends E2ETestBase {
 
     @Test
     void rootServesIndexHtmlWithTheStaticSecurityHeaders() {
-        ApiResponse response = api.get("/");
+        final ApiResponse response = api.get("/");
 
         assertThat(response.status()).isEqualTo(OK);
         assertThat(response.contentType()).startsWith("text/html");
@@ -35,7 +35,7 @@ class StaticUiE2E extends E2ETestBase {
 
     @Test
     void indexHtmlNeedsNoInlineScriptOrStyleSoTheContentSecurityPolicyHolds() {
-        String html = api.get("/").body();
+        final String html = api.get("/").body();
 
         assertThat(html).doesNotContainPattern("<script(?![^>]*\\bsrc=)[^>]*>")
                 .doesNotContainPattern("(?i)<style[\\s>]")
@@ -46,8 +46,8 @@ class StaticUiE2E extends E2ETestBase {
 
     @ParameterizedTest
     @MethodSource("javaScriptModules")
-    void everyJavaScriptModuleHasAJavaScriptMimeType(String module) {
-        ApiResponse response = api.get("/js/" + module);
+    void everyJavaScriptModuleHasAJavaScriptMimeType(final String module) {
+        final ApiResponse response = api.get("/js/" + module);
 
         assertThat(response.status()).isEqualTo(OK);
         assertThat(response.contentType()).matches("(application|text)/javascript.*");
@@ -56,7 +56,7 @@ class StaticUiE2E extends E2ETestBase {
 
     @Test
     void stylesheetIsServedAsCss() {
-        ApiResponse response = api.get("/styles.css");
+        final ApiResponse response = api.get("/styles.css");
 
         assertThat(response.status()).isEqualTo(OK);
         assertThat(response.contentType()).startsWith("text/css");
@@ -65,13 +65,13 @@ class StaticUiE2E extends E2ETestBase {
     @ParameterizedTest
     @ValueSource(strings = {"/mock/", "/mock/server.js", "/test/", "/test/api.test.js", "/test/index.js",
             "/package.json", "/README.md", "/.env"})
-    void developmentFilesAreNotServed(String path) {
+    void developmentFilesAreNotServed(final String path) {
         assertThat(api.get(path).status()).isEqualTo(NOT_FOUND);
     }
 
     @Test
     void directoryListingIsRefused() {
-        ApiResponse response = api.get("/js/");
+        final ApiResponse response = api.get("/js/");
 
         assertThat(response.status()).isEqualTo(FORBIDDEN);
         assertThat(response.body()).doesNotContain("app.js");
@@ -79,21 +79,21 @@ class StaticUiE2E extends E2ETestBase {
 
     @Test
     void unknownApiPathIsANotFoundProblem() {
-        ApiResponse response = api.get("/api/unknown");
+        final ApiResponse response = api.get("/api/unknown");
 
         assertThat(response.isProblem(NOT_FOUND)).as(response.toString()).isTrue();
     }
 
     @Test
     void apiResponsesCarryTheServerWideSecurityHeaders() {
-        ApiResponse response = api.get("/api/filings?limit=1");
+        final ApiResponse response = api.get("/api/filings?limit=1");
 
         assertSecurityHeaders(response);
     }
 
     @Test
     void problemResponsesOfNginxCarryTheServerWideSecurityHeaders() {
-        ApiResponse response = api.get("/api/unknown");
+        final ApiResponse response = api.get("/api/unknown");
 
         assertSecurityHeaders(response);
     }
@@ -105,28 +105,28 @@ class StaticUiE2E extends E2ETestBase {
 
     @Test
     void healthEndpointAnswersOk() {
-        ApiResponse response = api.get("/healthz");
+        final ApiResponse response = api.get("/healthz");
 
         assertThat(response.status()).isEqualTo(OK);
         assertThat(response.body()).isEqualTo("ok");
     }
 
     static Stream<String> javaScriptModules() throws IOException {
-        Path modules = system.repositoryRoot().resolve("frontend/js");
+        final Path modules = system.repositoryRoot().resolve("frontend/js");
         try (Stream<Path> files = Files.list(modules)) {
-            List<String> names = files.map(file -> file.getFileName().toString())
+            final List<String> names = files.map(file -> file.getFileName().toString())
                     .filter(name -> name.endsWith(".js")).sorted().toList();
             assertThat(names).isNotEmpty();
             return names.stream();
         }
     }
 
-    private static void assertStaticHeaders(ApiResponse response) {
+    private static void assertStaticHeaders(final ApiResponse response) {
         assertSecurityHeaders(response);
         assertThat(response.header("Cache-Control")).hasValue("no-cache");
     }
 
-    private static void assertSecurityHeaders(ApiResponse response) {
+    private static void assertSecurityHeaders(final ApiResponse response) {
         assertThat(response.header("Content-Security-Policy")).hasValue(CONTENT_SECURITY_POLICY);
         assertThat(response.header("X-Content-Type-Options")).hasValue("nosniff");
         assertThat(response.header("Referrer-Policy")).hasValue("no-referrer");

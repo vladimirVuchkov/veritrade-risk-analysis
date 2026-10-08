@@ -17,14 +17,14 @@ final class CountingText implements CharSequence {
     private final String text;
     private long reads;
 
-    CountingText(String text) {
+    CountingText(final String text) {
         this.text = text;
     }
 
     /** All rules of {@code rules} applied to {@code text}, as character reads per input character. */
-    static double readsPerChar(RuleSet rules, RuleMatcher matcher, String text) {
-        CountingText counting = new CountingText(text);
-        for (RiskRule rule : rules.rules()) {
+    static double readsPerChar(final RuleSet rules, final RuleMatcher matcher, final String text) {
+        final CountingText counting = new CountingText(text);
+        for (final RiskRule rule : rules.rules()) {
             matcher.findMatches(rule, counting);
         }
         return (double) counting.reads / text.length();
@@ -36,13 +36,13 @@ final class CountingText implements CharSequence {
     }
 
     @Override
-    public char charAt(int index) {
+    public char charAt(final int index) {
         reads++;
         return text.charAt(index);
     }
 
     @Override
-    public CharSequence subSequence(int start, int end) {
+    public CharSequence subSequence(final int start, final int end) {
         return text.subSequence(start, end);
     }
 

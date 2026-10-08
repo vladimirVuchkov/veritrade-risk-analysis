@@ -23,28 +23,28 @@ public class AnalysisEventListener {
     private final AnalysisEventReader reader;
     private final FilingStatusService statusService;
 
-    public AnalysisEventListener(AnalysisEventReader reader, FilingStatusService statusService) {
+    public AnalysisEventListener(final AnalysisEventReader reader, final FilingStatusService statusService) {
         this.reader = reader;
         this.statusService = statusService;
     }
 
     @RabbitListener(queues = MessagingTopology.Q_INGESTION_ANALYSIS_EVENTS)
-    public void onMessage(Message message) {
+    public void onMessage(final Message message) {
         putCorrelationId(message.getMessageProperties().getCorrelationId());
         try {
-            AnalysisEvent event = reader.read(message.getBody());
+            final AnalysisEvent event = reader.read(message.getBody());
             putCorrelationId(event.correlationId());
             log.info("Received {} event {} for filing {}", event.eventType(),
                     event.statusUpdate().eventId(), event.statusUpdate().filingId());
             statusService.apply(event.statusUpdate());
-        } catch (FilingNotFoundException e) {
+        } catch (final FilingNotFoundException e) {
             throw new InvalidEventException("Event for an unknown filing " + e.filingId(), e);
         } finally {
             MDC.remove(CorrelationIds.MDC_KEY);
         }
     }
 
-    private static void putCorrelationId(String correlationId) {
+    private static void putCorrelationId(final String correlationId) {
         if (correlationId != null) {
             MDC.put(CorrelationIds.MDC_KEY, correlationId);
         }

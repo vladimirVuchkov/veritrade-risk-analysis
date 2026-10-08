@@ -22,9 +22,9 @@ class ColumnTextTest {
 
     @Test
     void neverSplitsASurrogatePair() {
-        String text = "abcd" + SMILE;
+        final String text = "abcd" + SMILE;
 
-        String fitted = ColumnText.fit(text, 5);
+        final String fitted = ColumnText.fit(text, 5);
 
         assertThat(fitted).isEqualTo("abcd");
         assertThat(Character.isHighSurrogate(fitted.charAt(fitted.length() - 1))).isFalse();
@@ -37,7 +37,7 @@ class ColumnTextTest {
 
     @Test
     void fitsTextMadeOnlyOfSupplementaryCharacters() {
-        String fitted = ColumnText.fit(SMILE.repeat(500), 500);
+        final String fitted = ColumnText.fit(SMILE.repeat(500), 500);
 
         assertThat(fitted).hasSize(500).isEqualTo(SMILE.repeat(250));
         assertThat(ColumnText.fit(SMILE.repeat(500), 499)).isEqualTo(SMILE.repeat(249));

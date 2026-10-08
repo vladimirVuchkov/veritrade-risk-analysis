@@ -18,7 +18,7 @@ class ExcerptExtractorTest {
 
     @Test
     void takesTheConfiguredContextOnBothSides() {
-        String text = "0123456789MATCH0123456789";
+        final String text = "0123456789MATCH0123456789";
 
         assertThat(extractor.extract(text, new Match(10, 15))).isEqualTo("56789MATCH01234");
     }
@@ -45,18 +45,18 @@ class ExcerptExtractorTest {
 
     @Test
     void neverSplitsASurrogatePairAtTheLeftEdge() {
-        String text = "😀1234MATCH";
+        final String text = "😀1234MATCH";
 
-        String excerpt = extractor.extract(text, new Match(6, 11));
+        final String excerpt = extractor.extract(text, new Match(6, 11));
 
         assertThat(excerpt).isEqualTo("😀1234MATCH");
     }
 
     @Test
     void neverSplitsASurrogatePairAtTheRightEdge() {
-        String text = "MATCH1234😀tail";
+        final String text = "MATCH1234😀tail";
 
-        String excerpt = extractor.extract(text, new Match(0, 5));
+        final String excerpt = extractor.extract(text, new Match(0, 5));
 
         assertThat(excerpt).isEqualTo("MATCH1234😀");
     }
@@ -78,9 +78,9 @@ class ExcerptExtractorTest {
 
     @Test
     void shrinksTheContextSoThatALongMatchFitsTheMaximum() {
-        String text = "c".repeat(MAX) + "m".repeat(MAX_MATCH) + "c".repeat(MAX);
+        final String text = "c".repeat(MAX) + "m".repeat(MAX_MATCH) + "c".repeat(MAX);
 
-        String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, new Match(MAX, MAX + MAX_MATCH));
+        final String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, new Match(MAX, MAX + MAX_MATCH));
 
         assertThat(excerpt).hasSizeLessThanOrEqualTo(MAX).contains("m".repeat(MAX_MATCH));
         assertThat(excerpt).startsWith("c").endsWith("c");
@@ -88,7 +88,7 @@ class ExcerptExtractorTest {
 
     @Test
     void returnsOnlyAMatchOfExactlyTheMaximumLength() {
-        String text = "c".repeat(10) + "m".repeat(MAX) + "c".repeat(10);
+        final String text = "c".repeat(10) + "m".repeat(MAX) + "c".repeat(10);
 
         assertThat(new ExcerptExtractor(CONTEXT, MAX).extract(text, new Match(10, 10 + MAX))).isEqualTo("m".repeat(MAX));
     }
@@ -101,12 +101,12 @@ class ExcerptExtractorTest {
 
     @ParameterizedTest(name = "match of {0} code units")
     @ValueSource(ints = {1, 2, MAX_MATCH - 1, MAX_MATCH, MAX - 2, MAX - 1, MAX})
-    void neverExceedsTheMaximumEvenBetweenSurrogatePairs(int matchLength) {
-        String side = EMOJI.repeat(MAX);
-        String text = side + "m".repeat(matchLength) + side;
-        Match match = new Match(side.length(), side.length() + matchLength);
+    void neverExceedsTheMaximumEvenBetweenSurrogatePairs(final int matchLength) {
+        final String side = EMOJI.repeat(MAX);
+        final String text = side + "m".repeat(matchLength) + side;
+        final Match match = new Match(side.length(), side.length() + matchLength);
 
-        String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, match);
+        final String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, match);
 
         assertThat(excerpt).hasSizeLessThanOrEqualTo(MAX).contains("m".repeat(matchLength));
         assertThat(Character.isLowSurrogate(excerpt.charAt(0))).isFalse();
@@ -115,11 +115,11 @@ class ExcerptExtractorTest {
 
     @ParameterizedTest(name = "shifted by {0}")
     @ValueSource(ints = {0, 1})
-    void neverExceedsTheMaximumWhenTheContextEndsInsideASurrogatePair(int shift) {
-        String text = "x".repeat(shift) + EMOJI.repeat(MAX) + "m".repeat(MAX_MATCH) + "x".repeat(shift) + EMOJI.repeat(MAX);
-        int start = shift + 2 * MAX;
+    void neverExceedsTheMaximumWhenTheContextEndsInsideASurrogatePair(final int shift) {
+        final String text = "x".repeat(shift) + EMOJI.repeat(MAX) + "m".repeat(MAX_MATCH) + "x".repeat(shift) + EMOJI.repeat(MAX);
+        final int start = shift + 2 * MAX;
 
-        String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, new Match(start, start + MAX_MATCH));
+        final String excerpt = new ExcerptExtractor(MAX, MAX).extract(text, new Match(start, start + MAX_MATCH));
 
         assertThat(excerpt).hasSizeLessThanOrEqualTo(MAX);
     }

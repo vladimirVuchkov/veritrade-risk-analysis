@@ -18,7 +18,7 @@ public final class UpstreamProbe implements AutoCloseable {
     /** One request: when it started ({@link System#nanoTime()}), how long it took, and its answer or error. */
     public record Result(long startedNanos, Duration elapsed, ApiResponse response, RuntimeException error) {
 
-        public boolean isProblem(int status) {
+        public boolean isProblem(final int status) {
             return response != null && response.isProblem(status);
         }
 
@@ -32,19 +32,19 @@ public final class UpstreamProbe implements AutoCloseable {
     private final List<Result> results = new CopyOnWriteArrayList<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-    private UpstreamProbe(Supplier<ApiResponse> request) {
+    private UpstreamProbe(final Supplier<ApiResponse> request) {
         this.request = request;
     }
 
-    public static UpstreamProbe start(Supplier<ApiResponse> request) {
-        UpstreamProbe probe = new UpstreamProbe(request);
+    public static UpstreamProbe start(final Supplier<ApiResponse> request) {
+        final UpstreamProbe probe = new UpstreamProbe(request);
         probe.scheduler.scheduleWithFixedDelay(probe::probeOnce, 0, Timeouts.POLL_INTERVAL.toMillis(),
                 TimeUnit.MILLISECONDS);
         return probe;
     }
 
     /** True once a request that started at or after {@code nanos} has an answer. */
-    public boolean hasResultStartedAfter(long nanos) {
+    public boolean hasResultStartedAfter(final long nanos) {
         return results.stream().anyMatch(result -> result.startedNanos() - nanos >= 0);
     }
 
@@ -61,19 +61,19 @@ public final class UpstreamProbe implements AutoCloseable {
             if (!scheduler.awaitTermination(Timeouts.HTTP_REQUEST.multipliedBy(2).toMillis(), TimeUnit.MILLISECONDS)) {
                 scheduler.shutdownNow();
             }
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             scheduler.shutdownNow();
         }
     }
 
     private void probeOnce() {
-        long started = System.nanoTime();
+        final long started = System.nanoTime();
         ApiResponse response = null;
         RuntimeException error = null;
         try {
             response = request.get();
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             error = e;
         }
         results.add(new Result(started, Duration.ofNanos(System.nanoTime() - started), response, error));

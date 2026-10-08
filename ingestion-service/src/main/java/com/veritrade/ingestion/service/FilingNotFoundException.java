@@ -6,7 +6,7 @@ public class FilingNotFoundException extends RuntimeException {
 
     private final UUID filingId;
 
-    public FilingNotFoundException(UUID filingId) {
+    public FilingNotFoundException(final UUID filingId) {
         super("No filing with id " + filingId);
         this.filingId = filingId;
     }

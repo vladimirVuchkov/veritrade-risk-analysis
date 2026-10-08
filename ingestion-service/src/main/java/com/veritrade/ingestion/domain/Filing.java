@@ -52,7 +52,7 @@ public class Filing {
     protected Filing() {
     }
 
-    private Filing(UUID id, String companyName, String title, String content, Instant submittedAt) {
+    private Filing(final UUID id, final String companyName, final String title, final String content, final Instant submittedAt) {
         this.id = Objects.requireNonNull(id, "id");
         this.companyName = Objects.requireNonNull(companyName, "companyName");
         this.title = Objects.requireNonNull(title, "title");
@@ -62,7 +62,7 @@ public class Filing {
         this.status = FilingStatus.SUBMITTED;
     }
 
-    public static Filing submit(UUID id, String companyName, String title, String content, Instant submittedAt) {
+    public static Filing submit(final UUID id, final String companyName, final String title, final String content, final Instant submittedAt) {
         return new Filing(id, companyName, title, content, submittedAt);
     }
 

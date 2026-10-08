@@ -12,24 +12,24 @@ public record MessageProperties(String messageId, String correlationId, Map<Stri
     private static final String JSON = "application/json";
 
     /** The properties a contract producer sets: messageId, correlationId, JSON, persistent. */
-    public static MessageProperties contract(String messageId, String correlationId) {
+    public static MessageProperties contract(final String messageId, final String correlationId) {
         return new MessageProperties(messageId, correlationId, Map.of());
     }
 
-    public MessageProperties withHeader(String name, String value) {
-        Map<String, String> copy = new LinkedHashMap<>(headers);
+    public MessageProperties withHeader(final String name, final String value) {
+        final Map<String, String> copy = new LinkedHashMap<>(headers);
         copy.put(name, value);
         return new MessageProperties(messageId, correlationId, copy);
     }
 
-    ObjectNode toJson(int deliveryMode) {
-        ObjectNode properties = Json.object();
+    ObjectNode toJson(final int deliveryMode) {
+        final ObjectNode properties = Json.object();
         properties.put("message_id", messageId);
         properties.put("correlation_id", correlationId);
         properties.put("content_type", JSON);
         properties.put("delivery_mode", deliveryMode);
         properties.put("timestamp", Instant.now().getEpochSecond());
-        ObjectNode headerNode = properties.putObject("headers");
+        final ObjectNode headerNode = properties.putObject("headers");
         headers.forEach(headerNode::put);
         return properties;
     }

@@ -54,7 +54,7 @@ class DeadLetterIT {
     private static final Duration CONTRACT_BACKOFF = Duration.ofSeconds(3);
 
     @DynamicPropertySource
-    static void rabbit(DynamicPropertyRegistry registry) {
+    static void rabbit(final DynamicPropertyRegistry registry) {
         RabbitTestContainer.register(registry, "dead-letter-it");
     }
 
@@ -83,12 +83,12 @@ class DeadLetterIT {
 
     @ParameterizedTest
     @ValueSource(strings = {"{this is not json", "[]", "{\"eventType\":\"ANALYSIS_EXPLODED\"}"})
-    void unreadableMessageGoesStraightToTheDeadLetterQueueWithoutRetries(String body) {
-        Message poison = producerMessage(body, UUID.randomUUID(), "poison");
+    void unreadableMessageGoesStraightToTheDeadLetterQueueWithoutRetries(final String body) {
+        final Message poison = producerMessage(body, UUID.randomUUID(), "poison");
 
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_COMPLETED, poison);
 
-        Message deadLetter = rabbit.receive(DLQ, DLQ_WAIT_MILLIS);
+        final Message deadLetter = rabbit.receive(DLQ, DLQ_WAIT_MILLIS);
         assertThat(deadLetter).isNotNull();
         assertThat(new String(deadLetter.getBody(), StandardCharsets.UTF_8)).isEqualTo(body);
         assertThat(deadLetter.getMessageProperties().getMessageId()).isEqualTo(poison.getMessageProperties().getMessageId());
@@ -97,7 +97,7 @@ class DeadLetterIT {
 
     @Test
     void eventMissingRequiredPayloadFieldsGoesStraightToTheDeadLetterQueue() {
-        ObjectNode event = example(COMPLETED_EXAMPLE);
+        final ObjectNode event = example(COMPLETED_EXAMPLE);
         ((ObjectNode) event.get("payload")).remove("summary");
 
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_COMPLETED,
@@ -109,16 +109,16 @@ class DeadLetterIT {
 
     @Test
     void processingFailureIsRetriedExactlyThreeTimesThenDeadLettered() {
-        UUID filingId = UUID.randomUUID();
-        EventEnvelope<AnalysisCompletedPayload> event =
+        final UUID filingId = UUID.randomUUID();
+        final EventEnvelope<AnalysisCompletedPayload> event =
                 completedEnvelope(completed(filingId, RiskLevel.LOW, List.of(finding(RiskCategory.LEGAL, Severity.LOW, 1))));
         doThrow(new IllegalStateException("database unavailable"))
                 .when(reportService).recordCompleted(eq(event.eventId()), any());
-        Instant start = Instant.now();
+        final Instant start = Instant.now();
 
         rabbit.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_ANALYSIS_COMPLETED, producerMessage(event));
 
-        Message deadLetter = rabbit.receive(DLQ, DLQ_WAIT_MILLIS);
+        final Message deadLetter = rabbit.receive(DLQ, DLQ_WAIT_MILLIS);
         assertThat(deadLetter).isNotNull();
         assertThat(Duration.between(start, Instant.now())).isGreaterThanOrEqualTo(CONTRACT_BACKOFF);
         verify(reportService, times(CONTRACT_ATTEMPTS)).recordCompleted(eq(event.eventId()), any());
@@ -130,8 +130,8 @@ class DeadLetterIT {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> firstDeath(Message message) {
-        List<Map<String, Object>> deaths = (List<Map<String, Object>>) message.getMessageProperties().getHeaders().get("x-death");
+    private static Map<String, Object> firstDeath(final Message message) {
+        final List<Map<String, Object>> deaths = (List<Map<String, Object>>) message.getMessageProperties().getHeaders().get("x-death");
         assertThat(deaths).isNotEmpty();
         return deaths.getFirst();
     }

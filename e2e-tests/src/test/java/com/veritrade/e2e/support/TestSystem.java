@@ -17,7 +17,7 @@ public final class TestSystem implements AutoCloseable {
     private final Api api;
     private final Broker broker;
 
-    private TestSystem(Path repositoryRoot, ComposeStack stack) {
+    private TestSystem(final Path repositoryRoot, final ComposeStack stack) {
         this.repositoryRoot = repositoryRoot;
         this.stack = stack;
         this.api = new Api(() -> stack.endpoint(ComposeStack.FRONTEND, ComposeStack.UI_PORT));
@@ -25,7 +25,7 @@ public final class TestSystem implements AutoCloseable {
     }
 
     public static TestSystem start() {
-        Path root = Path.of(System.getProperty("e2e.repositoryRoot", "..")).toAbsolutePath().normalize();
+        final Path root = Path.of(System.getProperty("e2e.repositoryRoot", "..")).toAbsolutePath().normalize();
         return new TestSystem(root, ComposeStack.start(root));
     }
 
@@ -50,18 +50,18 @@ public final class TestSystem implements AutoCloseable {
     }
 
     /** Waits until one log line of the service contains every fragment. */
-    public void awaitLogLine(String service, String... fragments) {
+    public void awaitLogLine(final String service, final String... fragments) {
         awaitLogLine(Timeouts.MESSAGE_HANDLED, service, fragments);
     }
 
-    public void awaitLogLine(Duration timeout, String service, String... fragments) {
+    public void awaitLogLine(final Duration timeout, final String service, final String... fragments) {
         await(service + " logs a line with " + Arrays.toString(fragments))
                 .atMost(timeout).pollInterval(Timeouts.POLL_INTERVAL.multipliedBy(LOG_POLL_FACTOR))
                 .until(() -> countLogLines(service, fragments) > 0);
     }
 
     /** Number of log lines of the service that contain every fragment. */
-    public long countLogLines(String service, String... fragments) {
+    public long countLogLines(final String service, final String... fragments) {
         return stack.logs(service).lines()
                 .filter(line -> Arrays.stream(fragments).allMatch(line::contains))
                 .count();

@@ -58,28 +58,28 @@ public class Report {
     protected Report() {
     }
 
-    private Report(UUID filingId, ReportStatus status, Instant generatedAt) {
+    private Report(final UUID filingId, final ReportStatus status, final Instant generatedAt) {
         this.filingId = filingId;
         this.status = status;
         this.generatedAt = generatedAt;
     }
 
     public static Report completed(
-            UUID filingId, RiskLevel overallRiskLevel, int totalFindings, String rulesVersion, Instant generatedAt) {
-        Report report = new Report(filingId, ReportStatus.COMPLETED, generatedAt);
+            final UUID filingId, final RiskLevel overallRiskLevel, final int totalFindings, final String rulesVersion, final Instant generatedAt) {
+        final Report report = new Report(filingId, ReportStatus.COMPLETED, generatedAt);
         report.overallRiskLevel = overallRiskLevel;
         report.totalFindings = totalFindings;
         report.rulesVersion = rulesVersion;
         return report;
     }
 
-    public static Report failed(UUID filingId, String failureReason, Instant generatedAt) {
-        Report report = new Report(filingId, ReportStatus.FAILED, generatedAt);
+    public static Report failed(final UUID filingId, final String failureReason, final Instant generatedAt) {
+        final Report report = new Report(filingId, ReportStatus.FAILED, generatedAt);
         report.failureReason = failureReason;
         return report;
     }
 
-    public void addFinding(FindingEntity finding) {
+    public void addFinding(final FindingEntity finding) {
         finding.attachTo(this);
         findings.add(finding);
     }
@@ -91,14 +91,14 @@ public class Report {
 
     /** Number of findings per category; categories without findings are absent. */
     public Map<RiskCategory, Integer> countByCategory() {
-        Map<RiskCategory, Integer> counts = new EnumMap<>(RiskCategory.class);
+        final Map<RiskCategory, Integer> counts = new EnumMap<>(RiskCategory.class);
         findings.forEach(finding -> counts.merge(finding.getCategory(), 1, Integer::sum));
         return counts;
     }
 
     /** Number of findings per severity; severities without findings are absent. */
     public Map<Severity, Integer> countBySeverity() {
-        Map<Severity, Integer> counts = new EnumMap<>(Severity.class);
+        final Map<Severity, Integer> counts = new EnumMap<>(Severity.class);
         findings.forEach(finding -> counts.merge(finding.getSeverity(), 1, Integer::sum));
         return counts;
     }

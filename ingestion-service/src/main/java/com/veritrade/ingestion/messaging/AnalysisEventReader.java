@@ -31,33 +31,33 @@ public class AnalysisEventReader {
     private final JsonMapper jsonMapper;
     private final int maxFailureReasonLength;
 
-    public AnalysisEventReader(JsonMapper jsonMapper, IngestionProperties properties) {
+    public AnalysisEventReader(final JsonMapper jsonMapper, final IngestionProperties properties) {
         this.jsonMapper = jsonMapper;
         this.maxFailureReasonLength = properties.filing().maxFailureReasonLength();
     }
 
-    public AnalysisEvent read(byte[] body) {
-        JsonNode tree = parse(body);
-        EventType type = analysisEventType(tree);
+    public AnalysisEvent read(final byte[] body) {
+        final JsonNode tree = parse(body);
+        final EventType type = analysisEventType(tree);
         requireSupportedVersion(tree);
-        EventEnvelope<?> envelope = envelope(tree, type);
+        final EventEnvelope<?> envelope = envelope(tree, type);
         return new AnalysisEvent(type, envelope.correlationId(), statusUpdate(envelope));
     }
 
-    private JsonNode parse(byte[] body) {
+    private JsonNode parse(final byte[] body) {
         try {
-            JsonNode tree = jsonMapper.readTree(body);
+            final JsonNode tree = jsonMapper.readTree(body);
             if (tree == null || !tree.isObject()) {
                 throw new InvalidEventException("Message body is not a JSON object");
             }
             return tree;
-        } catch (JacksonException e) {
+        } catch (final JacksonException e) {
             throw new InvalidEventException("Message body is not valid JSON", e);
         }
     }
 
-    private static EventType analysisEventType(JsonNode tree) {
-        JsonNode node = tree.get("eventType");
+    private static EventType analysisEventType(final JsonNode tree) {
+        final JsonNode node = tree.get("eventType");
         if (node == null || !node.isString()) {
             throw new InvalidEventException("eventType is missing");
         }
@@ -68,8 +68,8 @@ public class AnalysisEventReader {
     }
 
     /** A missing or malformed version is left to the envelope check; only a newer one is singled out here. */
-    private static void requireSupportedVersion(JsonNode tree) {
-        JsonNode version = tree.get("eventVersion");
+    private static void requireSupportedVersion(final JsonNode tree) {
+        final JsonNode version = tree.get("eventVersion");
         if (version != null && version.isIntegralNumber()
                 && version.bigIntegerValue().compareTo(BigInteger.valueOf(EventEnvelope.CURRENT_VERSION)) > 0) {
             throw new InvalidEventException("Unsupported eventVersion " + version
@@ -77,18 +77,18 @@ public class AnalysisEventReader {
         }
     }
 
-    private EventEnvelope<?> envelope(JsonNode tree, EventType type) {
-        JavaType javaType = jsonMapper.getTypeFactory().constructParametricType(EventEnvelope.class, type.payloadType());
+    private EventEnvelope<?> envelope(final JsonNode tree, final EventType type) {
+        final JavaType javaType = jsonMapper.getTypeFactory().constructParametricType(EventEnvelope.class, type.payloadType());
         try {
             return jsonMapper.readerFor(javaType)
                     .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .readValue(tree);
-        } catch (JacksonException | IllegalArgumentException e) {
+        } catch (final JacksonException | IllegalArgumentException e) {
             throw new InvalidEventException("Invalid " + type + " event: " + e.getMessage(), e);
         }
     }
 
-    private StatusUpdate statusUpdate(EventEnvelope<?> envelope) {
+    private StatusUpdate statusUpdate(final EventEnvelope<?> envelope) {
         return switch (envelope.payload()) {
             case AnalysisStartedPayload started ->
                     update(envelope, started.filingId(), FilingStatus.ANALYZING, null);
@@ -100,14 +100,14 @@ public class AnalysisEventReader {
         };
     }
 
-    private static StatusUpdate update(EventEnvelope<?> envelope, UUID filingId, FilingStatus target, String reason) {
+    private static StatusUpdate update(final EventEnvelope<?> envelope, final UUID filingId, final FilingStatus target, final String reason) {
         if (filingId == null) {
             throw new InvalidEventException("payload.filingId is missing in event " + envelope.eventId());
         }
         return new StatusUpdate(envelope.eventId(), filingId, target, reason);
     }
 
-    private String requireReason(String reason) {
+    private String requireReason(final String reason) {
         if (reason == null || reason.isBlank()) {
             throw new InvalidEventException("payload.reason is missing");
         }

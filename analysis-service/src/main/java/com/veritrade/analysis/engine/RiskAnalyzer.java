@@ -24,18 +24,18 @@ public class RiskAnalyzer {
     private final ExcerptExtractor excerpts;
     private final RiskScorer scorer;
 
-    public RiskAnalyzer(RuleSet ruleSet, RuleMatcher matcher, ExcerptExtractor excerpts, RiskScorer scorer) {
+    public RiskAnalyzer(final RuleSet ruleSet, final RuleMatcher matcher, final ExcerptExtractor excerpts, final RiskScorer scorer) {
         this.ruleSet = Objects.requireNonNull(ruleSet, "ruleSet");
         this.matcher = Objects.requireNonNull(matcher, "matcher");
         this.excerpts = Objects.requireNonNull(excerpts, "excerpts");
         this.scorer = Objects.requireNonNull(scorer, "scorer");
     }
 
-    public AnalysisResult analyze(String text) {
+    public AnalysisResult analyze(final String text) {
         Objects.requireNonNull(text, "text");
-        List<Finding> findings = new ArrayList<>();
-        for (RiskRule rule : ruleSet.rules()) {
-            for (Match match : matcher.findMatches(rule, text)) {
+        final List<Finding> findings = new ArrayList<>();
+        for (final RiskRule rule : ruleSet.rules()) {
+            for (final Match match : matcher.findMatches(rule, text)) {
                 findings.add(toFinding(rule, match, text));
             }
         }
@@ -43,7 +43,7 @@ public class RiskAnalyzer {
         return new AnalysisResult(ruleSet.rulesVersion(), findings, scorer.score(findings), countByCategory(findings));
     }
 
-    private Finding toFinding(RiskRule rule, Match match, String text) {
+    private Finding toFinding(final RiskRule rule, final Match match, final String text) {
         return new Finding(
                 rule.category(),
                 rule.severity(),
@@ -53,9 +53,9 @@ public class RiskAnalyzer {
                 match.start());
     }
 
-    private static Map<RiskCategory, Integer> countByCategory(List<Finding> findings) {
-        Map<RiskCategory, Integer> counts = new EnumMap<>(RiskCategory.class);
-        for (Finding finding : findings) {
+    private static Map<RiskCategory, Integer> countByCategory(final List<Finding> findings) {
+        final Map<RiskCategory, Integer> counts = new EnumMap<>(RiskCategory.class);
+        for (final Finding finding : findings) {
             counts.merge(finding.category(), 1, Integer::sum);
         }
         return counts;

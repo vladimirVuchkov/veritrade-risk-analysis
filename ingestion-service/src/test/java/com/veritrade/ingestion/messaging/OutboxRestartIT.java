@@ -66,30 +66,30 @@ class OutboxRestartIT {
     void unsentEventIsPublishedAfterARestart() {
         UUID eventId;
         try (ConfigurableApplicationContext first = startService()) {
-            UUID filingId = first.getBean(FilingService.class)
+            final UUID filingId = first.getBean(FilingService.class)
                     .submit(new FilingSubmission("Acme", "10-K", "going concern"), "corr-restart").id();
             eventId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
-            OutboxRepository outbox = first.getBean(OutboxRepository.class);
+            final OutboxRepository outbox = first.getBean(OutboxRepository.class);
             await().during(SEVERAL_RUNS).atMost(SEVERAL_RUNS.plusSeconds(2))
                     .untilAsserted(() -> assertThat(outbox.findById(eventId).orElseThrow().publishedAt()).isNull());
         }
 
-        Queue consumer = bindConsumerQueue();
+        final Queue consumer = bindConsumerQueue();
         try (ConfigurableApplicationContext second = startService()) {
-            Message message = Broker.receiveMatching(new RabbitTemplate(connectionFactory), consumer.getName(),
+            final Message message = Broker.receiveMatching(new RabbitTemplate(connectionFactory), consumer.getName(),
                     Broker.withMessageId(eventId), WAIT);
 
             assertThat(message).isNotNull();
             assertThat(Contracts.validate(EventType.FILING_SUBMITTED,
                     new String(message.getBody(), StandardCharsets.UTF_8))).isEmpty();
-            OutboxRepository outbox = second.getBean(OutboxRepository.class);
+            final OutboxRepository outbox = second.getBean(OutboxRepository.class);
             await().atMost(WAIT).untilAsserted(
                     () -> assertThat(outbox.findById(eventId).orElseThrow().publishedAt()).isNotNull());
         }
     }
 
     private Queue bindConsumerQueue() {
-        Queue queue = QueueBuilder.durable("it.restart." + UUID.randomUUID()).build();
+        final Queue queue = QueueBuilder.durable("it.restart." + UUID.randomUUID()).build();
         admin.declareQueue(queue);
         admin.declareBinding(BindingBuilder.bind(queue).to(new TopicExchange("veritrade.events")).with("filing.submitted"));
         return queue;

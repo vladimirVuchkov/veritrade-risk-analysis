@@ -35,18 +35,18 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
 
     @Test
     void redeliveredFilingSubmittedIsAnalysedAgainAndChangesNothing() {
-        FilingRequest filing = system.demoFiling().withTitle("Redelivery " + UUID.randomUUID());
-        UUID filingId = api.submitAccepted(filing);
+        final FilingRequest filing = system.demoFiling().withTitle("Redelivery " + UUID.randomUUID());
+        final UUID filingId = api.submitAccepted(filing);
         api.awaitStatus(filingId, "COMPLETED");
-        String reportBefore = api.awaitReport(filingId).toString();
-        UUID submittedId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
+        final String reportBefore = api.awaitReport(filingId).toString();
+        final UUID submittedId = EventIds.forFiling(filingId, EventType.FILING_SUBMITTED);
 
         broker.publishEvent(Events.filingSubmitted(submittedId, filingId, correlationId("redelivery"), filing));
 
         await("second analysis of " + filingId).atMost(Timeouts.MESSAGE_HANDLED).pollInterval(Timeouts.POLL_INTERVAL)
                 .until(() -> system.countLogLines(ComposeStack.ANALYSIS, "Filing " + filingId + " analysed")
                         == REDELIVERED_ANALYSES);
-        String completedId = EventIds.forFiling(filingId, EventType.ANALYSIS_COMPLETED).toString();
+        final String completedId = EventIds.forFiling(filingId, EventType.ANALYSIS_COMPLETED).toString();
         system.awaitLogLine(ComposeStack.REPORTING, "Duplicate event ignored: eventId=" + completedId);
         system.awaitLogLine(ComposeStack.INGESTION, "Event " + completedId + " ignored: filing " + filingId
                 + " is already COMPLETED");
@@ -58,10 +58,10 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
     @ParameterizedTest
     @ValueSource(strings = {"com.veritrade.contracts.event.EventEnvelope", "java.lang.Runtime",
             "com.example.DoesNotExist", "java.util.HashMap"})
-    void typeHeaderOnFilingSubmittedIsIgnoredByAnalysis(String typeId) {
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = UUID.randomUUID();
-        ObjectNode event = submittedEvent(filingId, filing);
+    void typeHeaderOnFilingSubmittedIsIgnoredByAnalysis(final String typeId) {
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = UUID.randomUUID();
+        final ObjectNode event = submittedEvent(filingId, filing);
 
         broker.publishEvent(event, MessageProperties.contract(event.path("eventId").asString(),
                 event.path("correlationId").asString()).withHeader(MessageProperties.TYPE_ID_HEADER, typeId));
@@ -72,9 +72,9 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
 
     @Test
     void unknownFieldsInFilingSubmittedAreIgnoredByAnalysis() {
-        FilingRequest filing = system.demoFiling();
-        UUID filingId = UUID.randomUUID();
-        ObjectNode event = submittedEvent(filingId, filing);
+        final FilingRequest filing = system.demoFiling();
+        final UUID filingId = UUID.randomUUID();
+        final ObjectNode event = submittedEvent(filingId, filing);
         event.put("producedBy", "a later release");
         ((ObjectNode) event.path("payload")).putObject("attachments").put("count", 0);
 
@@ -86,13 +86,13 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
     /** Contract "Event versioning": a version Analysis does not support waits in its dead-letter queue. */
     @Test
     void higherEventVersionOfFilingSubmittedIsDeadLetteredWithoutRetries() {
-        UUID filingId = UUID.randomUUID();
-        ObjectNode event = submittedEvent(filingId, system.demoFiling());
+        final UUID filingId = UUID.randomUUID();
+        final ObjectNode event = submittedEvent(filingId, system.demoFiling());
         event.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
 
         broker.publishEvent(event);
 
-        JsonNode deadLetter = DeadLetters.awaitDeadLettered(broker, DeadLetters.ANALYSIS_DLQ, filingId.toString());
+        final JsonNode deadLetter = DeadLetters.awaitDeadLettered(broker, DeadLetters.ANALYSIS_DLQ, filingId.toString());
         assertThat(DeadLetters.death(deadLetter).path("reason").asString()).isEqualTo("rejected");
         assertThat(DeadLetters.death(deadLetter).path("count").asInt()).isOne();
         system.awaitLogLine(ComposeStack.ANALYSIS, "Unsupported eventVersion " + (EventEnvelope.CURRENT_VERSION + 1),
@@ -101,8 +101,8 @@ class FilingSubmittedConsumerE2E extends E2ETestBase {
         assertThat(api.report(filingId).status()).isEqualTo(NOT_FOUND);
     }
 
-    private static ObjectNode submittedEvent(UUID filingId, FilingRequest filing) {
-        ObjectNode event = Events.filingSubmitted(EventIds.forFiling(filingId, EventType.FILING_SUBMITTED), filingId,
+    private static ObjectNode submittedEvent(final UUID filingId, final FilingRequest filing) {
+        final ObjectNode event = Events.filingSubmitted(EventIds.forFiling(filingId, EventType.FILING_SUBMITTED), filingId,
                 correlationId("filing-submitted"), filing);
         Contracts.assertValidEvent(EventType.FILING_SUBMITTED, event);
         return event;

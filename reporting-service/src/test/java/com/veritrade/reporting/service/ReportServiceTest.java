@@ -74,14 +74,14 @@ class ReportServiceTest {
 
     @Test
     void completedEventCreatesTheReportWithFindingsAndSummaries() {
-        AnalysisCompletedPayload payload = completed(filingId, RiskLevel.HIGH, List.of(
+        final AnalysisCompletedPayload payload = completed(filingId, RiskLevel.HIGH, List.of(
                 finding(RiskCategory.LEGAL, Severity.HIGH, 41),
                 finding(RiskCategory.CYBERSECURITY, Severity.CRITICAL, 211),
                 finding(RiskCategory.LEGAL, Severity.LOW, 7)));
 
         assertThat(service.recordCompleted(UUID.randomUUID(), payload)).isEqualTo(RecordOutcome.CREATED);
 
-        ReportView view = service.findReport(filingId).orElseThrow();
+        final ReportView view = service.findReport(filingId).orElseThrow();
         assertThat(view.report().getStatus()).isEqualTo(ReportStatus.COMPLETED);
         assertThat(view.report().getOverallRiskLevel()).isEqualTo(RiskLevel.HIGH);
         assertThat(view.report().getTotalFindings()).isEqualTo(3);
@@ -94,8 +94,8 @@ class ReportServiceTest {
 
     @Test
     void duplicateEventIdGivesOneReportAndOneSetOfFindings() {
-        UUID eventId = UUID.randomUUID();
-        AnalysisCompletedPayload payload = completed(filingId, RiskLevel.HIGH,
+        final UUID eventId = UUID.randomUUID();
+        final AnalysisCompletedPayload payload = completed(filingId, RiskLevel.HIGH,
                 List.of(finding(RiskCategory.LEGAL, Severity.HIGH, 1), finding(RiskCategory.MARKET, Severity.LOW, 2)));
 
         assertThat(service.recordCompleted(eventId, payload)).isEqualTo(RecordOutcome.CREATED);
@@ -111,12 +111,12 @@ class ReportServiceTest {
     void sameFilingWithAnotherEventIdOfTheSameTypeIsIgnoredAsLate() {
         service.recordCompleted(UUID.randomUUID(),
                 completed(filingId, RiskLevel.HIGH, List.of(finding(RiskCategory.LEGAL, Severity.HIGH, 1))));
-        AnalysisCompletedPayload second = completed(filingId, RiskLevel.CRITICAL, List.of(
+        final AnalysisCompletedPayload second = completed(filingId, RiskLevel.CRITICAL, List.of(
                 finding(RiskCategory.MARKET, Severity.CRITICAL, 5), finding(RiskCategory.MARKET, Severity.CRITICAL, 6)));
 
         assertThat(service.recordCompleted(UUID.randomUUID(), second)).isEqualTo(RecordOutcome.IGNORED_LATE);
 
-        ReportView view = service.findReport(filingId).orElseThrow();
+        final ReportView view = service.findReport(filingId).orElseThrow();
         assertThat(view.report().getOverallRiskLevel()).isEqualTo(RiskLevel.HIGH);
         assertThat(view.findings()).singleElement().extracting(FindingEntity::getCategory).isEqualTo(RiskCategory.LEGAL);
         assertThat(processedEvents.count()).isEqualTo(2);
@@ -139,7 +139,7 @@ class ReportServiceTest {
         assertThat(service.recordFailed(UUID.randomUUID(), failed(filingId, "too late")))
                 .isEqualTo(RecordOutcome.IGNORED_LATE);
 
-        Report report = service.findReport(filingId).orElseThrow().report();
+        final Report report = service.findReport(filingId).orElseThrow().report();
         assertThat(report.getStatus()).isEqualTo(ReportStatus.COMPLETED);
         assertThat(report.getFailureReason()).isNull();
         assertThat(reports.count()).isEqualTo(1);
@@ -153,7 +153,7 @@ class ReportServiceTest {
                 completed(filingId, RiskLevel.HIGH, List.of(finding(RiskCategory.LEGAL, Severity.HIGH, 1)))))
                 .isEqualTo(RecordOutcome.IGNORED_LATE);
 
-        ReportView view = service.findReport(filingId).orElseThrow();
+        final ReportView view = service.findReport(filingId).orElseThrow();
         assertThat(view.report().getStatus()).isEqualTo(ReportStatus.FAILED);
         assertThat(view.report().getFailureReason()).isEqualTo("rule engine error");
         assertThat(view.findings()).isEmpty();
@@ -162,10 +162,10 @@ class ReportServiceTest {
 
     @Test
     void outOfOrderAndInterleavedEventsOfSeveralFilingsKeepTheFirstTerminalEventOfEach() {
-        UUID other = UUID.randomUUID();
-        UUID completedEventId = UUID.randomUUID();
-        UUID failedEventId = UUID.randomUUID();
-        AnalysisCompletedPayload completedPayload =
+        final UUID other = UUID.randomUUID();
+        final UUID completedEventId = UUID.randomUUID();
+        final UUID failedEventId = UUID.randomUUID();
+        final AnalysisCompletedPayload completedPayload =
                 completed(filingId, RiskLevel.LOW, List.of(finding(RiskCategory.MARKET, Severity.LOW, 9)));
 
         service.recordFailed(failedEventId, failed(other, "other failed"));
@@ -186,7 +186,7 @@ class ReportServiceTest {
     void zeroFindingsWithLevelNoneGiveAnEmptySummary() {
         service.recordCompleted(UUID.randomUUID(), completed(filingId, RiskLevel.NONE, List.of()));
 
-        ReportView view = service.findReport(filingId).orElseThrow();
+        final ReportView view = service.findReport(filingId).orElseThrow();
         assertThat(view.report().getOverallRiskLevel()).isEqualTo(RiskLevel.NONE);
         assertThat(view.report().getTotalFindings()).isZero();
         assertThat(view.findings()).isEmpty();
@@ -196,7 +196,7 @@ class ReportServiceTest {
 
     @ParameterizedTest
     @EnumSource(RiskLevel.class)
-    void storesEveryRiskLevel(RiskLevel level) {
+    void storesEveryRiskLevel(final RiskLevel level) {
         service.recordCompleted(UUID.randomUUID(), completed(filingId, level, List.of()));
 
         assertThat(service.findReport(filingId).orElseThrow().report().getOverallRiskLevel()).isEqualTo(level);
@@ -204,17 +204,17 @@ class ReportServiceTest {
 
     @Test
     void storesEverySeverityAndCategory() {
-        List<FindingPayload> findings = new ArrayList<>();
-        for (Severity severity : Severity.values()) {
-            for (RiskCategory category : RiskCategory.values()) {
+        final List<FindingPayload> findings = new ArrayList<>();
+        for (final Severity severity : Severity.values()) {
+            for (final RiskCategory category : RiskCategory.values()) {
                 findings.add(finding(category, severity, findings.size()));
             }
         }
         service.recordCompleted(UUID.randomUUID(), completed(filingId, RiskLevel.CRITICAL, findings));
 
-        ReportView view = service.findReport(filingId).orElseThrow();
-        int categories = RiskCategory.values().length;
-        int severities = Severity.values().length;
+        final ReportView view = service.findReport(filingId).orElseThrow();
+        final int categories = RiskCategory.values().length;
+        final int severities = Severity.values().length;
         assertThat(view.bySeverity()).hasSize(severities).allSatisfy((severity, count) -> assertThat(count).isEqualTo(categories));
         assertThat(view.byCategory()).hasSize(categories).allSatisfy((category, count) -> assertThat(count).isEqualTo(severities));
         assertThat(view.findings().getFirst().getSeverity()).isEqualTo(Severity.CRITICAL);
@@ -223,14 +223,14 @@ class ReportServiceTest {
 
     @Test
     void storesManyFindings() {
-        List<FindingPayload> findings = IntStream.range(0, MANY_FINDINGS)
+        final List<FindingPayload> findings = IntStream.range(0, MANY_FINDINGS)
                 .mapToObj(i -> finding(RiskCategory.values()[i % RiskCategory.values().length],
                         Severity.values()[i % Severity.values().length], i))
                 .toList();
 
         service.recordCompleted(UUID.randomUUID(), completed(filingId, RiskLevel.CRITICAL, findings));
 
-        ReportView view = service.findReport(filingId).orElseThrow();
+        final ReportView view = service.findReport(filingId).orElseThrow();
         assertThat(view.findings()).hasSize(MANY_FINDINGS);
         assertThat(view.report().getTotalFindings()).isEqualTo(MANY_FINDINGS);
         assertThat(view.byCategory().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(MANY_FINDINGS);
@@ -238,12 +238,12 @@ class ReportServiceTest {
 
     @Test
     void storesTextExactlyAtTheColumnSizes() {
-        FindingPayload longest = new FindingPayload(RiskCategory.LEGAL, Severity.HIGH,
+        final FindingPayload longest = new FindingPayload(RiskCategory.LEGAL, Severity.HIGH,
                 "R".repeat(32), "m".repeat(500), "e".repeat(1000), Integer.MAX_VALUE);
         service.recordCompleted(UUID.randomUUID(), new AnalysisCompletedPayload(filingId, null, "v".repeat(32),
                 new AnalysisSummary(1, RiskLevel.HIGH, Map.of(RiskCategory.LEGAL, 1)), List.of(longest)));
 
-        FindingEntity stored = service.findReport(filingId).orElseThrow().findings().getFirst();
+        final FindingEntity stored = service.findReport(filingId).orElseThrow().findings().getFirst();
         assertThat(stored.getMatchedText()).hasSize(500);
         assertThat(stored.getExcerpt()).hasSize(1000);
         assertThat(stored.getRuleId()).hasSize(32);
@@ -252,13 +252,13 @@ class ReportServiceTest {
 
     @Test
     void fitsOverlongSupplementaryTextIntoTheColumnsWithoutSplittingPairs() {
-        FindingPayload emojiFinding = new FindingPayload(RiskCategory.LEGAL, Severity.HIGH,
+        final FindingPayload emojiFinding = new FindingPayload(RiskCategory.LEGAL, Severity.HIGH,
                 "LEGAL-001", emoji(500), "x" + emoji(999), 0);
         service.recordCompleted(UUID.randomUUID(), completed(filingId, RiskLevel.HIGH, List.of(emojiFinding)));
-        UUID failedFiling = UUID.randomUUID();
+        final UUID failedFiling = UUID.randomUUID();
         service.recordFailed(UUID.randomUUID(), failed(failedFiling, emoji(1000)));
 
-        FindingEntity stored = service.findReport(filingId).orElseThrow().findings().getFirst();
+        final FindingEntity stored = service.findReport(filingId).orElseThrow().findings().getFirst();
         assertThat(stored.getMatchedText()).isEqualTo(emoji(250));
         assertThat(stored.getExcerpt()).isEqualTo("x" + emoji(499));
         assertThat(service.findReport(failedFiling).orElseThrow().report().getFailureReason()).isEqualTo(emoji(500));
@@ -266,9 +266,9 @@ class ReportServiceTest {
 
     @Test
     void failureWhileWritingRollsBackTheProcessedEventToo() {
-        UUID eventId = UUID.randomUUID();
-        FindingPayload broken = new FindingPayload(null, Severity.HIGH, "LEGAL-001", "text", "excerpt", 1);
-        AnalysisCompletedPayload payload = new AnalysisCompletedPayload(filingId, null, "1.0",
+        final UUID eventId = UUID.randomUUID();
+        final FindingPayload broken = new FindingPayload(null, Severity.HIGH, "LEGAL-001", "text", "excerpt", 1);
+        final AnalysisCompletedPayload payload = new AnalysisCompletedPayload(filingId, null, "1.0",
                 new AnalysisSummary(1, RiskLevel.HIGH, Map.of()), List.of(broken));
 
         assertThatThrownBy(() -> service.recordCompleted(eventId, payload)).isInstanceOf(RuntimeException.class);
@@ -279,8 +279,8 @@ class ReportServiceTest {
 
     @Test
     void exceptionFromTheRepositoryRollsBackTheProcessedEventAndTheRetrySucceeds() {
-        UUID eventId = UUID.randomUUID();
-        AnalysisCompletedPayload payload =
+        final UUID eventId = UUID.randomUUID();
+        final AnalysisCompletedPayload payload =
                 completed(filingId, RiskLevel.LOW, List.of(finding(RiskCategory.LEGAL, Severity.LOW, 1)));
         doThrow(new IllegalStateException("disk full")).when(reports).save(any(Report.class));
 

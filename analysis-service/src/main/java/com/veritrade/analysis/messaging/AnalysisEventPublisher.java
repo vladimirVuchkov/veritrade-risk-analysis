@@ -26,21 +26,21 @@ public class AnalysisEventPublisher {
     private final Duration confirmTimeout;
 
     /** The template carries the JSON converter (see {@code RabbitConfig}). */
-    public AnalysisEventPublisher(RabbitTemplate rabbitTemplate, MessagingProperties properties) {
+    public AnalysisEventPublisher(final RabbitTemplate rabbitTemplate, final MessagingProperties properties) {
         this.rabbitTemplate = rabbitTemplate;
         this.confirmTimeout = properties.confirmTimeout();
     }
 
-    public void publish(EventEnvelope<?> event) {
-        String eventId = event.eventId().toString();
-        CorrelationData correlation = new CorrelationData(eventId);
+    public void publish(final EventEnvelope<?> event) {
+        final String eventId = event.eventId().toString();
+        final CorrelationData correlation = new CorrelationData(eventId);
         rabbitTemplate.send(MessagingTopology.EVENTS_EXCHANGE, event.eventType().routingKey(),
                 toMessage(event), correlation);
         awaitConfirm(event, correlation);
     }
 
-    private Message toMessage(EventEnvelope<?> event) {
-        MessageProperties properties = new MessageProperties();
+    private Message toMessage(final EventEnvelope<?> event) {
+        final MessageProperties properties = new MessageProperties();
         properties.setMessageId(event.eventId().toString());
         properties.setCorrelationId(event.correlationId());
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
@@ -48,9 +48,9 @@ public class AnalysisEventPublisher {
         return rabbitTemplate.getMessageConverter().toMessage(event, properties);
     }
 
-    private void awaitConfirm(EventEnvelope<?> event, CorrelationData correlation) {
+    private void awaitConfirm(final EventEnvelope<?> event, final CorrelationData correlation) {
         try {
-            CorrelationData.Confirm confirm = correlation.getFuture()
+            final CorrelationData.Confirm confirm = correlation.getFuture()
                     .get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
             if (!confirm.ack()) {
                 throw new EventPublishException(event, "negative confirm: " + confirm.reason());
@@ -59,10 +59,10 @@ public class AnalysisEventPublisher {
                 throw new EventPublishException(event, "unroutable, returned with "
                         + correlation.getReturned().getReplyText());
             }
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new EventPublishException(event, "interrupted while waiting for the confirm", e);
-        } catch (ExecutionException | TimeoutException e) {
+        } catch (final ExecutionException | TimeoutException e) {
             throw new EventPublishException(event, "no confirm within " + confirmTimeout, e);
         }
     }

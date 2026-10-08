@@ -33,7 +33,7 @@ class QueryEdgeCasesE2E extends E2ETestBase {
 
     @BeforeAll
     static void atLeastMoreFilingsThanTheDefaultLimit() {
-        int missing = DEFAULT_LIMIT + 1 - list("?limit=" + MAX_LIMIT).size();
+        final int missing = DEFAULT_LIMIT + 1 - list("?limit=" + MAX_LIMIT).size();
         IntStream.range(0, Math.max(0, missing))
                 .forEach(i -> api.submitAccepted(FilingRequest.noRisk("Listing filler " + i)));
     }
@@ -51,7 +51,7 @@ class QueryEdgeCasesE2E extends E2ETestBase {
     /** Ingestion answers a malformed id with 400; Reporting with 404, because its OpenAPI operation has no 400. */
     @ParameterizedTest
     @ValueSource(strings = {"not-a-uuid", "123", "00000000-0000-4000-8000-00000000000Z"})
-    void malformedIdIsABadRequestForFilingsAndANotFoundForReports(String id) {
+    void malformedIdIsABadRequestForFilingsAndANotFoundForReports(final String id) {
         assertProblem(api.get(Api.FILINGS + "/" + id), BAD_REQUEST);
         assertProblem(api.get(Api.REPORTS + "/" + id), NOT_FOUND);
     }
@@ -73,7 +73,7 @@ class QueryEdgeCasesE2E extends E2ETestBase {
 
     @Test
     void limitOfOneHundredIsAccepted() {
-        List<JsonNode> filings = list("?limit=" + MAX_LIMIT);
+        final List<JsonNode> filings = list("?limit=" + MAX_LIMIT);
 
         assertThat(filings).hasSizeGreaterThan(DEFAULT_LIMIT).hasSizeLessThanOrEqualTo(MAX_LIMIT);
         filings.forEach(filing -> Contracts.assertMatchesApiSchema("FilingStatusResponse", filing));
@@ -81,17 +81,17 @@ class QueryEdgeCasesE2E extends E2ETestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"101", "0", "-1", "abc", "1.5", "99999999999"})
-    void limitOutsideOneToOneHundredOrNotAnIntegerIsABadRequestProblem(String limit) {
+    void limitOutsideOneToOneHundredOrNotAnIntegerIsABadRequestProblem(final String limit) {
         assertProblem(api.get(Api.FILINGS + "?limit=" + limit), BAD_REQUEST);
     }
 
     @Test
     void listIsNewestFirst() {
-        List<UUID> submitted = new ArrayList<>();
+        final List<UUID> submitted = new ArrayList<>();
         IntStream.range(0, NEWEST_FIRST_SAMPLE)
                 .forEach(i -> submitted.add(api.submitAccepted(FilingRequest.noRisk("Newest first " + i))));
 
-        List<JsonNode> newest = list("?limit=" + NEWEST_FIRST_SAMPLE);
+        final List<JsonNode> newest = list("?limit=" + NEWEST_FIRST_SAMPLE);
 
         assertThat(newest).extracting(filing -> UUID.fromString(filing.path("filingId").asString()))
                 .containsExactlyElementsOf(submitted.reversed());
@@ -100,13 +100,13 @@ class QueryEdgeCasesE2E extends E2ETestBase {
                 .isSortedAccordingTo(Comparator.reverseOrder());
     }
 
-    private static List<JsonNode> list(String query) {
-        ApiResponse response = api.get(Api.FILINGS + query);
+    private static List<JsonNode> list(final String query) {
+        final ApiResponse response = api.get(Api.FILINGS + query);
         assertThat(response.status()).as(response.toString()).isEqualTo(OK);
         return StreamSupport.stream(response.json().spliterator(), false).toList();
     }
 
-    private static void assertProblem(ApiResponse response, int status) {
+    private static void assertProblem(final ApiResponse response, final int status) {
         assertThat(response.isProblem(status)).as(response.toString()).isTrue();
         Contracts.assertMatchesApiSchema("ProblemDetail", response.json());
     }

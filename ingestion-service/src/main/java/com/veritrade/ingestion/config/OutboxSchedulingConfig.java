@@ -19,13 +19,13 @@ public class OutboxSchedulingConfig implements SchedulingConfigurer {
     private final OutboxPublisher publisher;
     private final IngestionProperties properties;
 
-    public OutboxSchedulingConfig(OutboxPublisher publisher, IngestionProperties properties) {
+    public OutboxSchedulingConfig(final OutboxPublisher publisher, final IngestionProperties properties) {
         this.publisher = publisher;
         this.properties = properties;
     }
 
     @Override
-    public void configureTasks(ScheduledTaskRegistrar registrar) {
+    public void configureTasks(final ScheduledTaskRegistrar registrar) {
         registrar.addFixedDelayTask(publisher::publishPending, properties.outbox().publishInterval());
     }
 }

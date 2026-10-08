@@ -57,7 +57,7 @@ public abstract class RabbitIntegrationTest {
     protected AmqpAdmin admin;
 
     @DynamicPropertySource
-    static void rabbitProperties(DynamicPropertyRegistry registry) {
+    static void rabbitProperties(final DynamicPropertyRegistry registry) {
         registry.add("spring.rabbitmq.host", RABBIT::getHost);
         registry.add("spring.rabbitmq.port", RABBIT::getAmqpPort);
         registry.add("spring.rabbitmq.username", RABBIT::getAdminUsername);
@@ -66,7 +66,7 @@ public abstract class RabbitIntegrationTest {
 
     @BeforeEach
     void prepareQueues() {
-        Queue capture = new Queue(CAPTURE_QUEUE, true, false, false);
+        final Queue capture = new Queue(CAPTURE_QUEUE, true, false, false);
         admin.declareQueue(capture);
         admin.declareBinding(BindingBuilder.bind(capture)
                 .to(new TopicExchange(MessagingTopology.EVENTS_EXCHANGE))
@@ -75,27 +75,27 @@ public abstract class RabbitIntegrationTest {
         admin.purgeQueue(DEAD_LETTER_QUEUE, false);
     }
 
-    protected void sendFilingSubmitted(String body) {
+    protected void sendFilingSubmitted(final String body) {
         sendFilingSubmitted(body, Map.of());
     }
 
-    protected void sendFilingSubmitted(String body, Map<String, Object> headers) {
-        MessageProperties properties = new MessageProperties();
+    protected void sendFilingSubmitted(final String body, final Map<String, Object> headers) {
+        final MessageProperties properties = new MessageProperties();
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         headers.forEach(properties::setHeader);
         rabbitTemplate.send(MessagingTopology.EVENTS_EXCHANGE, MessagingTopology.RK_FILING_SUBMITTED,
                 new Message(body.getBytes(StandardCharsets.UTF_8), properties));
     }
 
-    protected Message receive(String queue) {
-        Message message = rabbitTemplate.receive(queue, RECEIVE_TIMEOUT.toMillis());
+    protected Message receive(final String queue) {
+        final Message message = rabbitTemplate.receive(queue, RECEIVE_TIMEOUT.toMillis());
         assertThat(message).as("a message on " + queue).isNotNull();
         return message;
     }
 
     /** Receives analysis events until one of the given terminal type arrives; returns all of them. */
-    protected List<Message> receiveEventsUntil(EventType terminal) {
-        List<Message> received = new ArrayList<>();
+    protected List<Message> receiveEventsUntil(final EventType terminal) {
+        final List<Message> received = new ArrayList<>();
         Message message;
         do {
             message = receive(CAPTURE_QUEUE);
@@ -104,7 +104,7 @@ public abstract class RabbitIntegrationTest {
         return received;
     }
 
-    protected void assertNoMoreMessages(String queue) {
+    protected void assertNoMoreMessages(final String queue) {
         assertThat(rabbitTemplate.receive(queue, QUIET_PERIOD.toMillis())).as("no message on " + queue).isNull();
     }
 

@@ -21,16 +21,16 @@ public class AnalysisResultListener {
     private final AnalysisEventReader reader;
     private final ReportService reportService;
 
-    public AnalysisResultListener(AnalysisEventReader reader, ReportService reportService) {
+    public AnalysisResultListener(final AnalysisEventReader reader, final ReportService reportService) {
         this.reader = reader;
         this.reportService = reportService;
     }
 
     @RabbitListener(queues = MessagingTopology.Q_REPORTING_ANALYSIS_RESULTS)
-    public void onMessage(Message message) {
+    public void onMessage(final Message message) {
         putCorrelationId(message.getMessageProperties().getCorrelationId());
         try {
-            EventEnvelope<?> envelope = reader.read(message);
+            final EventEnvelope<?> envelope = reader.read(message);
             putCorrelationId(envelope.correlationId());
             dispatch(envelope);
         } finally {
@@ -38,7 +38,7 @@ public class AnalysisResultListener {
         }
     }
 
-    private void dispatch(EventEnvelope<?> envelope) {
+    private void dispatch(final EventEnvelope<?> envelope) {
         switch (envelope.payload()) {
             case AnalysisCompletedPayload completed -> reportService.recordCompleted(envelope.eventId(), completed);
             case AnalysisFailedPayload failed -> reportService.recordFailed(envelope.eventId(), failed);
@@ -46,7 +46,7 @@ public class AnalysisResultListener {
         }
     }
 
-    private static void putCorrelationId(String correlationId) {
+    private static void putCorrelationId(final String correlationId) {
         if (correlationId != null && !correlationId.isBlank()) {
             MDC.put(CorrelationIds.MDC_KEY, correlationId);
         }

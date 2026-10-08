@@ -12,7 +12,7 @@ public record FindingResponse(
         String excerpt,
         int position) {
 
-    public static FindingResponse from(FindingEntity finding) {
+    public static FindingResponse from(final FindingEntity finding) {
         return new FindingResponse(
                 finding.getCategory(),
                 finding.getSeverity(),

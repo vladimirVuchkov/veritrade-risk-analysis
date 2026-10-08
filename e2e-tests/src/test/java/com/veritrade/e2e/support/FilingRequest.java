@@ -14,35 +14,35 @@ public record FilingRequest(String companyName, String title, String content) {
             + "Attendance was strong, the weather was pleasant and everyone enjoyed the lemonade.";
 
     /** The demo filing used by smoke.sh: a 10-K excerpt with findings in every category. */
-    public static FilingRequest demo(Path repositoryRoot) {
+    public static FilingRequest demo(final Path repositoryRoot) {
         try {
-            JsonNode demo = Json.parse(Files.readString(repositoryRoot.resolve("scripts/demo-filing.json")));
+            final JsonNode demo = Json.parse(Files.readString(repositoryRoot.resolve("scripts/demo-filing.json")));
             return new FilingRequest(demo.path("companyName").asString(), demo.path("title").asString(),
                     demo.path("content").asString());
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /** Text that no risk rule matches. */
-    public static FilingRequest noRisk(String title) {
+    public static FilingRequest noRisk(final String title) {
         return new FilingRequest("Quiet Meadow Picnic Co.", title, NO_RISK_CONTENT);
     }
 
-    public FilingRequest withTitle(String newTitle) {
+    public FilingRequest withTitle(final String newTitle) {
         return new FilingRequest(companyName, newTitle, content);
     }
 
-    public FilingRequest withCompanyName(String newCompanyName) {
+    public FilingRequest withCompanyName(final String newCompanyName) {
         return new FilingRequest(newCompanyName, title, content);
     }
 
-    public FilingRequest withContent(String newContent) {
+    public FilingRequest withContent(final String newContent) {
         return new FilingRequest(companyName, title, newContent);
     }
 
     public ObjectNode toJsonNode() {
-        ObjectNode node = Json.object();
+        final ObjectNode node = Json.object();
         node.put("companyName", companyName);
         node.put("title", title);
         node.put("content", content);

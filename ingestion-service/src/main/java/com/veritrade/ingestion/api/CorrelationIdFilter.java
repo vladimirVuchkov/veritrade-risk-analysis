@@ -35,14 +35,14 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     private final int maxLength;
 
-    public CorrelationIdFilter(IngestionProperties properties) {
+    public CorrelationIdFilter(final IngestionProperties properties) {
         this.maxLength = properties.correlationId().maxLength();
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)
             throws ServletException, IOException {
-        String correlationId = resolve(request.getHeader(CorrelationIds.HTTP_HEADER));
+        final String correlationId = resolve(request.getHeader(CorrelationIds.HTTP_HEADER));
         request.setAttribute(REQUEST_ATTRIBUTE, correlationId);
         response.setHeader(CorrelationIds.HTTP_HEADER, correlationId);
         MDC.put(CorrelationIds.MDC_KEY, correlationId);
@@ -53,8 +53,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         }
     }
 
-    private String resolve(String header) {
-        String candidate = header == null ? "" : header.strip();
+    private String resolve(final String header) {
+        final String candidate = header == null ? "" : header.strip();
         if (candidate.isEmpty() || candidate.length() > maxLength || !TOKEN.matcher(candidate).matches()) {
             return UUID.randomUUID().toString();
         }

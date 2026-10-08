@@ -13,7 +13,7 @@ public class SqlRecorder implements StatementInspector {
     private static final List<String> STATEMENTS = new CopyOnWriteArrayList<>();
 
     @Override
-    public String inspect(String sql) {
+    public String inspect(final String sql) {
         STATEMENTS.add(sql);
         return sql;
     }

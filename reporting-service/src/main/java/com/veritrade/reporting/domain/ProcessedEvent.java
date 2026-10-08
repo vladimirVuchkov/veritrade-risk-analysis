@@ -22,7 +22,7 @@ public class ProcessedEvent {
     protected ProcessedEvent() {
     }
 
-    public ProcessedEvent(UUID eventId, Instant processedAt) {
+    public ProcessedEvent(final UUID eventId, final Instant processedAt) {
         this.eventId = eventId;
         this.processedAt = processedAt;
     }

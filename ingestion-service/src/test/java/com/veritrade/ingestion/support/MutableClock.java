@@ -11,11 +11,11 @@ public final class MutableClock extends Clock {
 
     private Instant now;
 
-    public MutableClock(Instant start) {
+    public MutableClock(final Instant start) {
         this.now = start;
     }
 
-    public void advance(Duration duration) {
+    public void advance(final Duration duration) {
         now = now.plus(duration);
     }
 
@@ -30,7 +30,7 @@ public final class MutableClock extends Clock {
     }
 
     @Override
-    public Clock withZone(ZoneId zone) {
+    public Clock withZone(final ZoneId zone) {
         throw new UnsupportedOperationException("A test clock has a fixed zone");
     }
 }

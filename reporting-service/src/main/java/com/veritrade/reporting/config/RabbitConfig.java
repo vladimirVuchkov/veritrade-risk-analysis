@@ -47,19 +47,19 @@ public class RabbitConfig {
     }
 
     @Bean
-    Binding analysisCompletedBinding(Queue analysisResultsQueue, TopicExchange eventsExchange) {
+    Binding analysisCompletedBinding(final Queue analysisResultsQueue, final TopicExchange eventsExchange) {
         return BindingBuilder.bind(analysisResultsQueue).to(eventsExchange)
                 .with(MessagingTopology.RK_ANALYSIS_COMPLETED);
     }
 
     @Bean
-    Binding analysisFailedBinding(Queue analysisResultsQueue, TopicExchange eventsExchange) {
+    Binding analysisFailedBinding(final Queue analysisResultsQueue, final TopicExchange eventsExchange) {
         return BindingBuilder.bind(analysisResultsQueue).to(eventsExchange)
                 .with(MessagingTopology.RK_ANALYSIS_FAILED);
     }
 
     @Bean
-    Binding analysisResultsDeadLetterBinding(Queue analysisResultsDeadLetterQueue, DirectExchange deadLetterExchange) {
+    Binding analysisResultsDeadLetterBinding(final Queue analysisResultsDeadLetterQueue, final DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(analysisResultsDeadLetterQueue).to(deadLetterExchange).with(WORK_QUEUE);
     }
 
@@ -69,7 +69,7 @@ public class RabbitConfig {
         return settings -> settings.setExceptionPredicate(RabbitConfig::isRetryable);
     }
 
-    static boolean isRetryable(Throwable failure) {
+    static boolean isRetryable(final Throwable failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
             if (cause instanceof AmqpRejectAndDontRequeueException || cause instanceof MessageConversionException) {
                 return false;

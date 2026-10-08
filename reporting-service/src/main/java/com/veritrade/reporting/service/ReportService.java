@@ -33,7 +33,7 @@ public class ReportService {
     private final Clock clock;
 
     public ReportService(
-            ReportRepository reports, IdempotencyGuard idempotencyGuard, ReportingLimits limits, Clock clock) {
+            final ReportRepository reports, final IdempotencyGuard idempotencyGuard, final ReportingLimits limits, final Clock clock) {
         this.reports = reports;
         this.idempotencyGuard = idempotencyGuard;
         this.limits = limits;
@@ -41,12 +41,12 @@ public class ReportService {
     }
 
     @Transactional
-    public RecordOutcome recordCompleted(UUID eventId, AnalysisCompletedPayload payload) {
+    public RecordOutcome recordCompleted(final UUID eventId, final AnalysisCompletedPayload payload) {
         return record(eventId, payload.filingId(), ReportStatus.COMPLETED, () -> completedReport(payload));
     }
 
     @Transactional
-    public RecordOutcome recordFailed(UUID eventId, AnalysisFailedPayload payload) {
+    public RecordOutcome recordFailed(final UUID eventId, final AnalysisFailedPayload payload) {
         return record(eventId, payload.filingId(), ReportStatus.FAILED, () -> Report.failed(
                 payload.filingId(),
                 ColumnText.fit(payload.reason(), limits.failureReasonMaxLength()),
@@ -54,16 +54,16 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<ReportView> findReport(UUID filingId) {
+    public Optional<ReportView> findReport(final UUID filingId) {
         return reports.findById(filingId).map(ReportView::of);
     }
 
-    private RecordOutcome record(UUID eventId, UUID filingId, ReportStatus incoming, Supplier<Report> newReport) {
+    private RecordOutcome record(final UUID eventId, final UUID filingId, final ReportStatus incoming, final Supplier<Report> newReport) {
         if (idempotencyGuard.alreadyProcessed(eventId)) {
             log.info("Duplicate event ignored: eventId={}, filingId={}, eventStatus={}", eventId, filingId, incoming);
             return RecordOutcome.DUPLICATE;
         }
-        Optional<Report> existing = reports.findById(filingId);
+        final Optional<Report> existing = reports.findById(filingId);
         idempotencyGuard.markProcessed(eventId);
         if (existing.isPresent()) {
             log.warn("Late or contradictory event ignored, the first terminal event wins: "
@@ -76,8 +76,8 @@ public class ReportService {
         return RecordOutcome.CREATED;
     }
 
-    private Report completedReport(AnalysisCompletedPayload payload) {
-        Report report = Report.completed(
+    private Report completedReport(final AnalysisCompletedPayload payload) {
+        final Report report = Report.completed(
                 payload.filingId(),
                 payload.summary().overallRiskLevel(),
                 payload.summary().totalFindings(),
@@ -87,7 +87,7 @@ public class ReportService {
         return report;
     }
 
-    private FindingEntity toEntity(FindingPayload finding) {
+    private FindingEntity toEntity(final FindingPayload finding) {
         return new FindingEntity(
                 finding.category(),
                 finding.severity(),

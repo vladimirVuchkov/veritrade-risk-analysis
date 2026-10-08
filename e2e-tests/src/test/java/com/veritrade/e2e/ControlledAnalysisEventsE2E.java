@@ -65,29 +65,29 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void duplicateAnalysisCompletedGivesOneReportWithoutDuplicateFindings() {
-        UUID filingId = submit();
-        ObjectNode completed = completed(filingId, twoFindings());
+        final UUID filingId = submit();
+        final ObjectNode completed = completed(filingId, twoFindings());
 
         broker.publishEvent(completed);
         broker.publishEvent(completed);
 
-        String eventId = completed.path("eventId").asString();
+        final String eventId = completed.path("eventId").asString();
         system.awaitLogLine(ComposeStack.REPORTING, "Duplicate event ignored: eventId=" + eventId);
         system.awaitLogLine(ComposeStack.INGESTION, "Event " + eventId + " ignored: filing " + filingId + " is already COMPLETED");
-        JsonNode report = api.awaitReport(filingId);
+        final JsonNode report = api.awaitReport(filingId);
         assertThat(ReportAssertions.findings(report)).hasSize(2);
         settle(filingId, "COMPLETED");
     }
 
     @Test
     void duplicateAnalysisFailedGivesOneFailedReport() {
-        UUID filingId = submit();
-        ObjectNode failed = failed(filingId);
+        final UUID filingId = submit();
+        final ObjectNode failed = failed(filingId);
 
         broker.publishEvent(failed);
         broker.publishEvent(failed);
 
-        String eventId = failed.path("eventId").asString();
+        final String eventId = failed.path("eventId").asString();
         system.awaitLogLine(ComposeStack.REPORTING, "Duplicate event ignored: eventId=" + eventId);
         system.awaitLogLine(ComposeStack.INGESTION, "Event " + eventId + " ignored: filing " + filingId + " is already FAILED");
         assertFailedEverywhere(filingId);
@@ -96,8 +96,8 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void analysisCompletedBeforeAnalysisStartedEndsCompleted() {
-        UUID filingId = submit();
-        ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("order"));
+        final UUID filingId = submit();
+        final ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("order"));
 
         broker.publishEvent(completed(filingId, twoFindings()));
         broker.publishEvent(started);
@@ -111,11 +111,11 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void analysisFailedAfterCompletedIsIgnoredByIngestionAndReporting() {
-        UUID filingId = submit();
+        final UUID filingId = submit();
         broker.publishEvent(completed(filingId, twoFindings()));
         api.awaitStatus(filingId, "COMPLETED");
-        String reportBefore = api.awaitReport(filingId).toString();
-        ObjectNode failed = failed(filingId);
+        final String reportBefore = api.awaitReport(filingId).toString();
+        final ObjectNode failed = failed(filingId);
 
         broker.publishEvent(failed);
 
@@ -126,8 +126,8 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void analysisCompletedAfterFailedIsIgnoredAndBothServicesAgreeOnFailed() {
-        UUID filingId = submit();
-        ObjectNode completed = completed(filingId, twoFindings());
+        final UUID filingId = submit();
+        final ObjectNode completed = completed(filingId, twoFindings());
 
         broker.publishEvent(failed(filingId));
         broker.publishEvent(completed);
@@ -139,7 +139,7 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void analysisFailureReachesFailedWithTheReasonInIngestionAndReporting() {
-        UUID filingId = submit();
+        final UUID filingId = submit();
 
         broker.publishEvent(Events.started(UUID.randomUUID(), filingId, correlationId("failure")));
         broker.publishEvent(failed(filingId));
@@ -154,10 +154,10 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     @ParameterizedTest
     @ValueSource(strings = {"com.veritrade.contracts.event.EventEnvelope", "java.lang.Runtime",
             "com.example.DoesNotExist", "java.util.HashMap"})
-    void typeHeaderIsIgnoredByIngestionAndReporting(String typeId) {
-        UUID filingId = submit();
-        ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("type-header"));
-        ObjectNode completed = completed(filingId, twoFindings());
+    void typeHeaderIsIgnoredByIngestionAndReporting(final String typeId) {
+        final UUID filingId = submit();
+        final ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("type-header"));
+        final ObjectNode completed = completed(filingId, twoFindings());
 
         broker.publishEvent(started, withTypeHeader(started, typeId));
         broker.publishEvent(completed, withTypeHeader(completed, typeId));
@@ -171,9 +171,9 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
 
     @Test
     void unknownFieldsAtEveryLevelAreIgnored() {
-        UUID filingId = submit();
-        ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("unknown-fields"));
-        ObjectNode completed = completed(filingId, twoFindings());
+        final UUID filingId = submit();
+        final ObjectNode started = Events.started(UUID.randomUUID(), filingId, correlationId("unknown-fields"));
+        final ObjectNode completed = completed(filingId, twoFindings());
         List.of(started, completed, (ObjectNode) started.path("payload"), (ObjectNode) completed.path("payload"),
                         (ObjectNode) completed.path("payload").path("summary"),
                         (ObjectNode) completed.path("payload").path("findings").path(0))
@@ -195,13 +195,13 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
      */
     @Test
     void higherEventVersionIsDeadLetteredByIngestionAndReporting() {
-        UUID filingId = submit();
-        ObjectNode completed = completed(filingId, twoFindings());
+        final UUID filingId = submit();
+        final ObjectNode completed = completed(filingId, twoFindings());
         completed.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1);
 
         broker.publishEvent(completed);
 
-        String eventId = completed.path("eventId").asString();
+        final String eventId = completed.path("eventId").asString();
         DeadLetters.awaitDeadLettered(broker, DeadLetters.INGESTION_DLQ, eventId);
         DeadLetters.awaitDeadLettered(broker, DeadLetters.REPORTING_DLQ, eventId);
         assertThat(api.status(filingId)).isEqualTo("SUBMITTED");
@@ -211,9 +211,9 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     /** Contract, "Text limits": a reason one UTF-16 unit over 1000 is dead-lettered by Ingestion, not cut. */
     @Test
     void failureReasonOverTheUtf16LimitIsDeadLetteredByIngestion() {
-        UUID filingId = submit();
-        String overLimit = "r".repeat(MAX_REASON_UNITS - 1) + EMOJI;
-        ObjectNode failed = Events.failed(UUID.randomUUID(), filingId, correlationId("reason-over-limit"), overLimit);
+        final UUID filingId = submit();
+        final String overLimit = "r".repeat(MAX_REASON_UNITS - 1) + EMOJI;
+        final ObjectNode failed = Events.failed(UUID.randomUUID(), filingId, correlationId("reason-over-limit"), overLimit);
 
         broker.publishEvent(failed);
 
@@ -224,13 +224,13 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     /** The contract counts text limits in UTF-16 units: 250 emoji are 500 units, at the matchedText limit. */
     @Test
     void reportingAcceptsMatchedTextAtTheUtf16LimitAndStoresItIntact() {
-        UUID filingId = submit();
-        String atLimit = EMOJI.repeat(MAX_MATCHED_TEXT_UNITS / EMOJI_UNITS);
+        final UUID filingId = submit();
+        final String atLimit = EMOJI.repeat(MAX_MATCHED_TEXT_UNITS / EMOJI_UNITS);
 
         broker.publishEvent(completed(filingId, List.of(
                 Events.finding(RiskCategory.MARKET, Severity.LOW, "MKT-001", atLimit, 0))));
 
-        JsonNode report = api.awaitReport(filingId);
+        final JsonNode report = api.awaitReport(filingId);
         assertThat(report.path("findings").path(0).path("matchedText").asString()).isEqualTo(atLimit);
         settle(filingId, "COMPLETED");
     }
@@ -238,12 +238,12 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
     /** One UTF-16 unit over the limit is invalid, also when it is still only 251 code points. */
     @ParameterizedTest
     @ValueSource(strings = {"ascii", "emoji"})
-    void reportingDeadLettersMatchedTextOneUtf16UnitOverTheLimit(String kind) {
-        UUID filingId = submit();
-        String overLimit = kind.equals("ascii")
+    void reportingDeadLettersMatchedTextOneUtf16UnitOverTheLimit(final String kind) {
+        final UUID filingId = submit();
+        final String overLimit = kind.equals("ascii")
                 ? "m".repeat(MAX_MATCHED_TEXT_UNITS + 1)
                 : EMOJI.repeat(MAX_MATCHED_TEXT_UNITS / EMOJI_UNITS) + "m";
-        ObjectNode completed = Events.completed(UUID.randomUUID(), filingId, correlationId("over-limit"), List.of(
+        final ObjectNode completed = Events.completed(UUID.randomUUID(), filingId, correlationId("over-limit"), List.of(
                 Events.finding(RiskCategory.MARKET, Severity.LOW, "MKT-001", overLimit, 0)));
 
         broker.publishEvent(completed);
@@ -270,14 +270,14 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
         return api.submitAccepted(system.demoFiling().withTitle("Controlled events " + UUID.randomUUID()));
     }
 
-    private static ObjectNode completed(UUID filingId, List<ObjectNode> findings) {
-        ObjectNode event = Events.completed(UUID.randomUUID(), filingId, correlationId("controlled"), findings);
+    private static ObjectNode completed(final UUID filingId, final List<ObjectNode> findings) {
+        final ObjectNode event = Events.completed(UUID.randomUUID(), filingId, correlationId("controlled"), findings);
         Contracts.assertValidEvent(EventType.ANALYSIS_COMPLETED, event);
         return event;
     }
 
-    private static ObjectNode failed(UUID filingId) {
-        ObjectNode event = Events.failed(UUID.randomUUID(), filingId, correlationId("controlled"), FAILURE_REASON);
+    private static ObjectNode failed(final UUID filingId) {
+        final ObjectNode event = Events.failed(UUID.randomUUID(), filingId, correlationId("controlled"), FAILURE_REASON);
         Contracts.assertValidEvent(EventType.ANALYSIS_FAILED, event);
         return event;
     }
@@ -288,15 +288,15 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
                 Events.finding(RiskCategory.MARKET, Severity.LOW, "MKT-001", "intense competition", 40));
     }
 
-    private static MessageProperties withTypeHeader(ObjectNode event, String typeId) {
+    private static MessageProperties withTypeHeader(final ObjectNode event, final String typeId) {
         return MessageProperties.contract(event.path("eventId").asString(), event.path("correlationId").asString())
                 .withHeader(MessageProperties.TYPE_ID_HEADER, typeId);
     }
 
-    private static void assertFailedEverywhere(UUID filingId) {
-        JsonNode filing = api.awaitStatus(filingId, "FAILED");
+    private static void assertFailedEverywhere(final UUID filingId) {
+        final JsonNode filing = api.awaitStatus(filingId, "FAILED");
         assertThat(filing.path("failureReason").asString()).isEqualTo(FAILURE_REASON);
-        JsonNode report = api.awaitReport(filingId);
+        final JsonNode report = api.awaitReport(filingId);
         Contracts.assertMatchesApiSchema("ReportResponse", report);
         assertThat(report.path("status").asString()).isEqualTo("FAILED");
         assertThat(report.path("failureReason").asString()).isEqualTo(FAILURE_REASON);
@@ -304,8 +304,8 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
         assertThat(report.path("findings").isEmpty()).isTrue();
     }
 
-    private static void assertLateEventIgnoredByBoth(ObjectNode late, UUID filingId, String kept, String requested) {
-        String eventId = late.path("eventId").asString();
+    private static void assertLateEventIgnoredByBoth(final ObjectNode late, final UUID filingId, final String kept, final String requested) {
+        final String eventId = late.path("eventId").asString();
         system.awaitLogLine(ComposeStack.INGESTION, "Late or contradictory event " + eventId,
                 "is " + kept + ", event requests " + requested);
         system.awaitLogLine(ComposeStack.REPORTING, "Late or contradictory event ignored", "eventId=" + eventId,
@@ -315,14 +315,14 @@ class ControlledAnalysisEventsE2E extends E2ETestBase {
         DeadLetters.assertNothingDeadLetteredFor(broker, eventId);
     }
 
-    private static void settle(UUID filingId, String status) {
+    private static void settle(final UUID filingId, final String status) {
         api.awaitStatus(filingId, status);
         api.awaitReport(filingId);
         SETTLED.put(filingId, outcome(filingId));
     }
 
-    private static Outcome outcome(UUID filingId) {
-        JsonNode filing = api.filing(filingId).json();
+    private static Outcome outcome(final UUID filingId) {
+        final JsonNode filing = api.filing(filingId).json();
         return new Outcome(filing.path("status").asString(), filing.path("failureReason").asString(""),
                 api.report(filingId).body());
     }

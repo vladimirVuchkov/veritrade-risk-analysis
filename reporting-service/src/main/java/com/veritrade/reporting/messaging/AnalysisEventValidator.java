@@ -17,11 +17,11 @@ public class AnalysisEventValidator {
 
     private final ReportingLimits limits;
 
-    public AnalysisEventValidator(ReportingLimits limits) {
+    public AnalysisEventValidator(final ReportingLimits limits) {
         this.limits = limits;
     }
 
-    public void validate(EventEnvelope<?> envelope) {
+    public void validate(final EventEnvelope<?> envelope) {
         if (envelope.eventVersion() > EventEnvelope.CURRENT_VERSION) {
             throw new InvalidEventException("Unsupported eventVersion: " + envelope.eventVersion());
         }
@@ -32,7 +32,7 @@ public class AnalysisEventValidator {
         }
     }
 
-    private void validateCompleted(AnalysisCompletedPayload payload) {
+    private void validateCompleted(final AnalysisCompletedPayload payload) {
         require(payload.filingId() != null, "filingId is required");
         require(payload.analyzedAt() != null, "analyzedAt is required");
         requireText(payload.rulesVersion(), limits.rulesVersionMaxLength(), "rulesVersion");
@@ -40,13 +40,13 @@ public class AnalysisEventValidator {
         payload.findings().forEach(this::validateFinding);
     }
 
-    private static void validateSummary(AnalysisSummary summary) {
+    private static void validateSummary(final AnalysisSummary summary) {
         require(summary != null, "summary is required");
         require(summary.overallRiskLevel() != null, "summary.overallRiskLevel is required");
         require(summary.totalFindings() >= 0, "summary.totalFindings must not be negative");
     }
 
-    private void validateFinding(FindingPayload finding) {
+    private void validateFinding(final FindingPayload finding) {
         require(finding != null, "finding must not be null");
         require(finding.category() != null, "finding.category is required");
         require(finding.severity() != null, "finding.severity is required");
@@ -56,18 +56,18 @@ public class AnalysisEventValidator {
         require(finding.position() >= 0, "finding.position must not be negative");
     }
 
-    private void validateFailed(AnalysisFailedPayload payload) {
+    private void validateFailed(final AnalysisFailedPayload payload) {
         require(payload.filingId() != null, "filingId is required");
         require(payload.failedAt() != null, "failedAt is required");
         requireText(payload.reason(), limits.failureReasonMaxLength(), "reason");
     }
 
-    private static void requireText(String value, int maxUtf16Units, String field) {
+    private static void requireText(final String value, final int maxUtf16Units, final String field) {
         require(value != null && !value.isEmpty(), field + " is required");
         require(value.length() <= maxUtf16Units, field + " is longer than " + maxUtf16Units + " UTF-16 units");
     }
 
-    private static void require(boolean condition, String message) {
+    private static void require(final boolean condition, final String message) {
         if (!condition) {
             throw new InvalidEventException("Invalid event: " + message);
         }

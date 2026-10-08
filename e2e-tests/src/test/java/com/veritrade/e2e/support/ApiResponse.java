@@ -17,11 +17,11 @@ public record ApiResponse(int status, HttpHeaders headers, String body) {
         return header("Content-Type").orElse("");
     }
 
-    public Optional<String> header(String name) {
+    public Optional<String> header(final String name) {
         return headers.firstValue(name);
     }
 
-    public boolean isProblem(int expectedStatus) {
+    public boolean isProblem(final int expectedStatus) {
         return status == expectedStatus && contentType().startsWith(PROBLEM_JSON)
                 && json().path("status").asInt() == expectedStatus;
     }

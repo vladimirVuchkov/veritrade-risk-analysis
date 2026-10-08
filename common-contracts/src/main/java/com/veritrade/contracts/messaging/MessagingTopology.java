@@ -28,7 +28,7 @@ public final class MessagingTopology {
     }
 
     /** Dead-letter queue of a work queue; it is bound to the dead-letter exchange with its work queue name as key. */
-    public static String deadLetterQueue(String workQueue) {
+    public static String deadLetterQueue(final String workQueue) {
         return workQueue + DLQ_SUFFIX;
     }
 }

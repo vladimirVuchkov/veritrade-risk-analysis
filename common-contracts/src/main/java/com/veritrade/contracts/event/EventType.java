@@ -12,7 +12,7 @@ public enum EventType {
     private final String routingKey;
     private final Class<?> payloadType;
 
-    EventType(String routingKey, Class<?> payloadType) {
+    EventType(final String routingKey, final Class<?> payloadType) {
         this.routingKey = routingKey;
         this.payloadType = payloadType;
     }
@@ -25,8 +25,8 @@ public enum EventType {
         return payloadType;
     }
 
-    public static EventType fromRoutingKey(String routingKey) {
-        for (EventType type : values()) {
+    public static EventType fromRoutingKey(final String routingKey) {
+        for (final EventType type : values()) {
             if (type.routingKey.equals(routingKey)) {
                 return type;
             }

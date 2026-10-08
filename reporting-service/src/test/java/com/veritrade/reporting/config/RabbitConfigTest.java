@@ -24,7 +24,7 @@ class RabbitConfigTest {
 
     @Test
     void workQueueIsDurableWithExactlyTheDeadLetterArguments() {
-        Queue queue = config.analysisResultsQueue();
+        final Queue queue = config.analysisResultsQueue();
 
         assertThat(queue.getName()).isEqualTo("reporting.analysis-results");
         assertThat(queue.isDurable()).isTrue();
@@ -37,7 +37,7 @@ class RabbitConfigTest {
 
     @Test
     void deadLetterQueueIsDurableWithoutArguments() {
-        Queue dlq = config.analysisResultsDeadLetterQueue();
+        final Queue dlq = config.analysisResultsDeadLetterQueue();
 
         assertThat(dlq.getName()).isEqualTo(DLQ);
         assertThat(dlq.isDurable()).isTrue();
@@ -48,8 +48,8 @@ class RabbitConfigTest {
 
     @Test
     void exchangesAreDurableAndNotAutoDeleted() {
-        TopicExchange events = config.eventsExchange();
-        DirectExchange dlx = config.deadLetterExchange();
+        final TopicExchange events = config.eventsExchange();
+        final DirectExchange dlx = config.deadLetterExchange();
 
         assertThat(events.getName()).isEqualTo("veritrade.events");
         assertThat(events.isDurable()).isTrue();
@@ -61,12 +61,12 @@ class RabbitConfigTest {
 
     @Test
     void bindsCompletedAndFailedOnlyAndTheDeadLetterQueueByQueueName() {
-        Queue queue = config.analysisResultsQueue();
-        TopicExchange events = config.eventsExchange();
+        final Queue queue = config.analysisResultsQueue();
+        final TopicExchange events = config.eventsExchange();
 
-        Binding completed = config.analysisCompletedBinding(queue, events);
-        Binding failed = config.analysisFailedBinding(queue, events);
-        Binding deadLetter = config.analysisResultsDeadLetterBinding(
+        final Binding completed = config.analysisCompletedBinding(queue, events);
+        final Binding failed = config.analysisFailedBinding(queue, events);
+        final Binding deadLetter = config.analysisResultsDeadLetterBinding(
                 config.analysisResultsDeadLetterQueue(), config.deadLetterExchange());
 
         assertThat(completed.getRoutingKey()).isEqualTo("analysis.completed");
@@ -97,7 +97,7 @@ class RabbitConfigTest {
 
     @Test
     void retryCustomizerInstallsThePredicate() {
-        RetryPolicySettings settings = new RetryPolicySettings();
+        final RetryPolicySettings settings = new RetryPolicySettings();
 
         config.noRetryForUnreadableMessages().customize(settings);
 

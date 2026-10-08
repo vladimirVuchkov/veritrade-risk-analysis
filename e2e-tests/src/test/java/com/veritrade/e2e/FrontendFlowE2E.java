@@ -18,19 +18,19 @@ class FrontendFlowE2E extends E2ETestBase {
 
     @Test
     void frontendModulesDriveSubmitPollAndReportAgainstTheRealStack() throws IOException, InterruptedException {
-        Path script = system.repositoryRoot().resolve("e2e-tests/src/test/node/frontend-flow.test.mjs");
-        ProcessBuilder builder = new ProcessBuilder("node", "--test", script.toString())
+        final Path script = system.repositoryRoot().resolve("e2e-tests/src/test/node/frontend-flow.test.mjs");
+        final ProcessBuilder builder = new ProcessBuilder("node", "--test", script.toString())
                 .directory(system.repositoryRoot().toFile())
                 .redirectErrorStream(true);
         builder.environment().put("E2E_BASE_URL", api.baseUri().toString());
         builder.environment().put("E2E_REPOSITORY_ROOT", system.repositoryRoot().toString());
 
-        Process node = builder.start();
-        boolean finished = node.waitFor(Timeouts.NODE_FLOW.toMillis(), TimeUnit.MILLISECONDS);
+        final Process node = builder.start();
+        final boolean finished = node.waitFor(Timeouts.NODE_FLOW.toMillis(), TimeUnit.MILLISECONDS);
         if (!finished) {
             node.destroyForcibly();
         }
-        String output = new String(node.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        final String output = new String(node.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
         assertThat(finished).as("node finished within %s", Timeouts.NODE_FLOW).isTrue();
         assertThat(node.exitValue()).as(output).isZero();

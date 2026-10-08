@@ -9,15 +9,15 @@ import org.springframework.amqp.support.converter.MessageConversionException;
  */
 public class InvalidEventException extends RuntimeException {
 
-    public InvalidEventException(String message) {
+    public InvalidEventException(final String message) {
         super(message);
     }
 
-    public InvalidEventException(String message, Throwable cause) {
+    public InvalidEventException(final String message, final Throwable cause) {
         super(message, cause);
     }
 
-    public static boolean isUnprocessable(Throwable exception) {
+    public static boolean isUnprocessable(final Throwable exception) {
         for (Throwable current = exception; current != null; current = current.getCause()) {
             if (current instanceof InvalidEventException || current instanceof MessageConversionException) {
                 return true;

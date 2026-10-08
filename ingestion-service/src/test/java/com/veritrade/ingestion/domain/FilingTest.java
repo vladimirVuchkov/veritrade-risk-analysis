@@ -14,7 +14,7 @@ class FilingTest {
 
     @Test
     void newFilingIsSubmitted() {
-        Filing filing = newFiling();
+        final Filing filing = newFiling();
 
         assertThat(filing.status()).isEqualTo(SUBMITTED);
         assertThat(filing.updatedAt()).isEqualTo(SUBMITTED_AT);
@@ -32,9 +32,9 @@ class FilingTest {
 
     @Test
     void viewCarriesEverythingButTheContent() {
-        Filing filing = newFiling();
+        final Filing filing = newFiling();
 
-        FilingView view = FilingView.of(filing);
+        final FilingView view = FilingView.of(filing);
 
         assertThat(view).isEqualTo(new FilingView(filing.id(), "Acme", "10-K", SUBMITTED, SUBMITTED_AT, null));
     }

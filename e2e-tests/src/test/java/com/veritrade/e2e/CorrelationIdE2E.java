@@ -21,10 +21,10 @@ class CorrelationIdE2E extends E2ETestBase {
 
     @Test
     void correlationIdIsReturnedAndLoggedByNginxAndAllThreeServices() {
-        String correlationId = correlationId("correlation");
+        final String correlationId = correlationId("correlation");
 
-        ApiResponse response = api.submit(system.demoFiling().toJson(), Map.of(Api.CORRELATION_HEADER, correlationId));
-        UUID filingId = UUID.fromString(response.json().path("filingId").asString());
+        final ApiResponse response = api.submit(system.demoFiling().toJson(), Map.of(Api.CORRELATION_HEADER, correlationId));
+        final UUID filingId = UUID.fromString(response.json().path("filingId").asString());
 
         assertThat(response.header(Api.CORRELATION_HEADER)).hasValue(correlationId);
         api.awaitStatus(filingId, "COMPLETED");
@@ -38,20 +38,20 @@ class CorrelationIdE2E extends E2ETestBase {
 
     @Test
     void missingCorrelationIdIsGeneratedAndReturned() {
-        ApiResponse response = api.submit(FilingRequest.noRisk("No correlation id").toJson(), Map.of());
+        final ApiResponse response = api.submit(FilingRequest.noRisk("No correlation id").toJson(), Map.of());
 
-        String generated = response.header(Api.CORRELATION_HEADER).orElseThrow();
+        final String generated = response.header(Api.CORRELATION_HEADER).orElseThrow();
         assertThat(UUID.fromString(generated)).isNotNull();
-        UUID filingId = UUID.fromString(response.json().path("filingId").asString());
+        final UUID filingId = UUID.fromString(response.json().path("filingId").asString());
         api.awaitReport(filingId);
         system.awaitLogLine(ComposeStack.REPORTING, generated, "Report stored");
     }
 
     @Test
     void correlationIdOverTheMaximumLengthIsReplacedByAGeneratedOne() {
-        String tooLong = "x".repeat(MAX_CORRELATION_ID_LENGTH + 1);
+        final String tooLong = "x".repeat(MAX_CORRELATION_ID_LENGTH + 1);
 
-        ApiResponse response = api.submit(FilingRequest.noRisk("Long correlation id").toJson(),
+        final ApiResponse response = api.submit(FilingRequest.noRisk("Long correlation id").toJson(),
                 Map.of(Api.CORRELATION_HEADER, tooLong));
 
         assertThat(UUID.fromString(response.header(Api.CORRELATION_HEADER).orElseThrow())).isNotNull();
@@ -59,9 +59,9 @@ class CorrelationIdE2E extends E2ETestBase {
 
     @Test
     void correlationIdAtTheMaximumLengthIsKept() {
-        String atLimit = "y".repeat(MAX_CORRELATION_ID_LENGTH);
+        final String atLimit = "y".repeat(MAX_CORRELATION_ID_LENGTH);
 
-        ApiResponse response = api.submit(FilingRequest.noRisk("Correlation id at the limit").toJson(),
+        final ApiResponse response = api.submit(FilingRequest.noRisk("Correlation id at the limit").toJson(),
                 Map.of(Api.CORRELATION_HEADER, atLimit));
 
         assertThat(response.header(Api.CORRELATION_HEADER)).hasValue(atLimit);
@@ -74,15 +74,15 @@ class CorrelationIdE2E extends E2ETestBase {
      */
     @Test
     void nonAsciiCorrelationIdIsReplacedAndDoesNotBlockLaterFilings() {
-        String rawUtf8 = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+        final String rawUtf8 = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
 
-        ApiResponse response = api.submit(FilingRequest.noRisk("Non-ASCII correlation id").toJson(),
+        final ApiResponse response = api.submit(FilingRequest.noRisk("Non-ASCII correlation id").toJson(),
                 Map.of(Api.CORRELATION_HEADER, rawUtf8));
-        UUID next = api.submitAccepted(FilingRequest.noRisk("Filing after a non-ASCII correlation id"));
+        final UUID next = api.submitAccepted(FilingRequest.noRisk("Filing after a non-ASCII correlation id"));
 
-        String generated = response.header(Api.CORRELATION_HEADER).orElseThrow();
+        final String generated = response.header(Api.CORRELATION_HEADER).orElseThrow();
         assertThat(UUID.fromString(generated)).isNotNull();
-        UUID filingId = UUID.fromString(response.json().path("filingId").asString());
+        final UUID filingId = UUID.fromString(response.json().path("filingId").asString());
         api.awaitStatus(filingId, "COMPLETED");
         api.awaitStatus(next, "COMPLETED");
         system.awaitLogLine(ComposeStack.INGESTION, generated, "Published event");
@@ -90,8 +90,8 @@ class CorrelationIdE2E extends E2ETestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"has inner spaces", "slash/and;semicolon", "quote\"d"})
-    void correlationIdThatIsNotAStrictTokenIsReplacedByAGeneratedOne(String header) {
-        ApiResponse response = api.submit(FilingRequest.noRisk("Correlation id not a token").toJson(),
+    void correlationIdThatIsNotAStrictTokenIsReplacedByAGeneratedOne(final String header) {
+        final ApiResponse response = api.submit(FilingRequest.noRisk("Correlation id not a token").toJson(),
                 Map.of(Api.CORRELATION_HEADER, header));
 
         assertThat(UUID.fromString(response.header(Api.CORRELATION_HEADER).orElseThrow())).isNotNull();
@@ -99,9 +99,9 @@ class CorrelationIdE2E extends E2ETestBase {
 
     @Test
     void correlationIdIsReturnedOnErrorsToo() {
-        String correlationId = correlationId("error");
+        final String correlationId = correlationId("error");
 
-        ApiResponse response = api.submit("{not json", Map.of(Api.CORRELATION_HEADER, correlationId));
+        final ApiResponse response = api.submit("{not json", Map.of(Api.CORRELATION_HEADER, correlationId));
 
         assertThat(response.header(Api.CORRELATION_HEADER)).hasValue(correlationId);
     }

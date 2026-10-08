@@ -20,24 +20,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(InvalidRequestException.class)
-    ProblemDetail handleInvalidRequest(InvalidRequestException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    ProblemDetail handleInvalidRequest(final InvalidRequestException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
         problem.setTitle("Invalid request");
         problem.setProperty("errors", exception.errors());
         return problem;
     }
 
     @ExceptionHandler(FilingNotFoundException.class)
-    ProblemDetail handleNotFound(FilingNotFoundException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    ProblemDetail handleNotFound(final FilingNotFoundException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
         problem.setTitle("Filing not found");
         return problem;
     }
 
     @ExceptionHandler(Exception.class)
-    ProblemDetail handleUnexpected(Exception exception) {
+    ProblemDetail handleUnexpected(final Exception exception) {
         log.error("Unexpected error", exception);
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
                 "The request could not be processed");
         problem.setTitle("Internal error");
         return problem;

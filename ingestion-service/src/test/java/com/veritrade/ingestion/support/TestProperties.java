@@ -24,12 +24,12 @@ public final class TestProperties {
     }
 
     /** Without a back-off between runs, so every call of the publisher runs. */
-    public static IngestionProperties withOutbox(int batchSize, Duration confirmTimeout) {
+    public static IngestionProperties withOutbox(final int batchSize, final Duration confirmTimeout) {
         return withOutbox(batchSize, confirmTimeout, Duration.ZERO, Duration.ZERO);
     }
 
-    public static IngestionProperties withOutbox(int batchSize, Duration confirmTimeout, Duration retryBackoff,
-            Duration maxRetryBackoff) {
+    public static IngestionProperties withOutbox(final int batchSize, final Duration confirmTimeout, final Duration retryBackoff,
+            final Duration maxRetryBackoff) {
         return new IngestionProperties(
                 new IngestionProperties.FilingLimits(MAX_CONTENT_BYTES, MAX_COMPANY_NAME_LENGTH, MAX_TITLE_LENGTH,
                         MAX_FAILURE_REASON_LENGTH),

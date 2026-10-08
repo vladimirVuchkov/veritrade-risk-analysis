@@ -41,7 +41,7 @@ class AnalysisEventFactoryTest {
 
     @Test
     void buildsAStartedEventThatMatchesTheSchema() {
-        EventEnvelope<AnalysisStartedPayload> event = factory.started(FILING_ID, CORRELATION_ID);
+        final EventEnvelope<AnalysisStartedPayload> event = factory.started(FILING_ID, CORRELATION_ID);
 
         assertThat(event.eventId()).isEqualTo(EventIds.forFiling(FILING_ID, EventType.ANALYSIS_STARTED));
         assertThat(event.eventType()).isEqualTo(EventType.ANALYSIS_STARTED);
@@ -54,21 +54,21 @@ class AnalysisEventFactoryTest {
 
     @Test
     void buildsTheCompletedEventOfTheContractExample() {
-        String content = ContractFixtures.example(EventType.FILING_SUBMITTED).get("payload").get("content").asString();
-        AnalysisResult result = TestMessages.bundledAnalyzer().analyze(content);
+        final String content = ContractFixtures.example(EventType.FILING_SUBMITTED).get("payload").get("content").asString();
+        final AnalysisResult result = TestMessages.bundledAnalyzer().analyze(content);
 
-        EventEnvelope<AnalysisCompletedPayload> event = factory.completed(FILING_ID, CORRELATION_ID, result);
+        final EventEnvelope<AnalysisCompletedPayload> event = factory.completed(FILING_ID, CORRELATION_ID, result);
 
-        JsonNode json = ContractFixtures.MAPPER.valueToTree(event);
+        final JsonNode json = ContractFixtures.MAPPER.valueToTree(event);
         assertThat(json).isEqualTo(ContractFixtures.example(EventType.ANALYSIS_COMPLETED));
         assertValid(event);
     }
 
     @Test
     void buildsACompletedEventWithoutFindings() {
-        AnalysisResult empty = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
+        final AnalysisResult empty = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
 
-        EventEnvelope<AnalysisCompletedPayload> event = factory.completed(FILING_ID, CORRELATION_ID, empty);
+        final EventEnvelope<AnalysisCompletedPayload> event = factory.completed(FILING_ID, CORRELATION_ID, empty);
 
         assertThat(event.payload().summary().totalFindings()).isZero();
         assertThat(event.payload().summary().overallRiskLevel()).isEqualTo(RiskLevel.NONE);
@@ -78,10 +78,10 @@ class AnalysisEventFactoryTest {
 
     @Test
     void copiesEveryFindingField() {
-        Finding finding = new Finding(RiskCategory.MARKET, Severity.LOW, "MKT-005", "inflation", "some inflation", 5);
-        AnalysisResult result = new AnalysisResult("1.0", List.of(finding), RiskLevel.LOW, Map.of(RiskCategory.MARKET, 1));
+        final Finding finding = new Finding(RiskCategory.MARKET, Severity.LOW, "MKT-005", "inflation", "some inflation", 5);
+        final AnalysisResult result = new AnalysisResult("1.0", List.of(finding), RiskLevel.LOW, Map.of(RiskCategory.MARKET, 1));
 
-        AnalysisCompletedPayload payload = factory.completed(FILING_ID, CORRELATION_ID, result).payload();
+        final AnalysisCompletedPayload payload = factory.completed(FILING_ID, CORRELATION_ID, result).payload();
 
         assertThat(payload.findings()).singleElement().satisfies(p -> {
             assertThat(p.category()).isEqualTo(RiskCategory.MARKET);
@@ -95,28 +95,28 @@ class AnalysisEventFactoryTest {
 
     @Test
     void buildsTheFailedEventOfTheContractExample() {
-        Clock failedAt = Clock.fixed(Instant.parse("2026-10-07T12:00:05Z"), ZoneOffset.UTC);
+        final Clock failedAt = Clock.fixed(Instant.parse("2026-10-07T12:00:05Z"), ZoneOffset.UTC);
 
-        EventEnvelope<AnalysisFailedPayload> event = new AnalysisEventFactory(failedAt, TestMessages.MESSAGING)
+        final EventEnvelope<AnalysisFailedPayload> event = new AnalysisEventFactory(failedAt, TestMessages.MESSAGING)
                 .failed(FILING_ID, CORRELATION_ID, "Analysis failed after 3 attempts: rule engine error");
 
-        JsonNode json = ContractFixtures.MAPPER.valueToTree(event);
+        final JsonNode json = ContractFixtures.MAPPER.valueToTree(event);
         assertThat(json).isEqualTo(ContractFixtures.example(EventType.ANALYSIS_FAILED));
         assertValid(event);
     }
 
     @ParameterizedTest(name = "{0} code units")
     @ValueSource(ints = {LIMIT - 1, LIMIT})
-    void keepsAReasonUpToTheLimitUnchanged(int length) {
-        String reason = "y".repeat(length);
+    void keepsAReasonUpToTheLimitUnchanged(final int length) {
+        final String reason = "y".repeat(length);
 
         assertThat(factory.failed(FILING_ID, CORRELATION_ID, reason).payload().reason()).isEqualTo(reason);
     }
 
     @ParameterizedTest(name = "{0} code units")
     @ValueSource(ints = {LIMIT + 1, 5000})
-    void cutsALongerReasonToTheLimit(int length) {
-        EventEnvelope<AnalysisFailedPayload> event = factory.failed(FILING_ID, CORRELATION_ID, "x".repeat(length));
+    void cutsALongerReasonToTheLimit(final int length) {
+        final EventEnvelope<AnalysisFailedPayload> event = factory.failed(FILING_ID, CORRELATION_ID, "x".repeat(length));
 
         assertThat(event.payload().reason()).isEqualTo("x".repeat(LIMIT));
         assertValid(event);
@@ -124,9 +124,9 @@ class AnalysisEventFactoryTest {
 
     @Test
     void dropsASurrogatePairThatWouldBeSplitAtTheLimit() {
-        String reason = "x".repeat(LIMIT - 1) + EMOJI + "tail";
+        final String reason = "x".repeat(LIMIT - 1) + EMOJI + "tail";
 
-        String cut = factory.failed(FILING_ID, CORRELATION_ID, reason).payload().reason();
+        final String cut = factory.failed(FILING_ID, CORRELATION_ID, reason).payload().reason();
 
         assertThat(cut).isEqualTo("x".repeat(LIMIT - 1));
         assertThat(Character.isHighSurrogate(cut.charAt(cut.length() - 1))).isFalse();
@@ -134,7 +134,7 @@ class AnalysisEventFactoryTest {
 
     @Test
     void keepsASurrogatePairThatEndsExactlyAtTheLimit() {
-        String reason = "x".repeat(LIMIT - 2) + EMOJI + "tail";
+        final String reason = "x".repeat(LIMIT - 2) + EMOJI + "tail";
 
         assertThat(factory.failed(FILING_ID, CORRELATION_ID, reason).payload().reason())
                 .isEqualTo("x".repeat(LIMIT - 2) + EMOJI)
@@ -143,14 +143,14 @@ class AnalysisEventFactoryTest {
 
     @Test
     void cutsAReasonMadeOnlyOfSurrogatePairsToWholeCharacters() {
-        String cut = factory.failed(FILING_ID, CORRELATION_ID, EMOJI.repeat(LIMIT)).payload().reason();
+        final String cut = factory.failed(FILING_ID, CORRELATION_ID, EMOJI.repeat(LIMIT)).payload().reason();
 
         assertThat(cut).hasSize(LIMIT).isEqualTo(EMOJI.repeat(LIMIT / 2));
     }
 
     @Test
     void appliesAConfiguredLowerLimit() {
-        AnalysisEventFactory shortReasons = new AnalysisEventFactory(Clock.fixed(NOW, ZoneOffset.UTC),
+        final AnalysisEventFactory shortReasons = new AnalysisEventFactory(Clock.fixed(NOW, ZoneOffset.UTC),
                 new MessagingProperties(Duration.ofSeconds(1), 3));
 
         assertThat(shortReasons.failed(FILING_ID, CORRELATION_ID, "ab" + EMOJI).payload().reason()).isEqualTo("ab");
@@ -160,7 +160,7 @@ class AnalysisEventFactoryTest {
 
     @ParameterizedTest
     @ValueSource(ints = {-1, 0, 1, LIMIT + 1})
-    void refusesALimitOutsideTheSchema(int limit) {
+    void refusesALimitOutsideTheSchema(final int limit) {
         assertThatThrownBy(() -> new MessagingProperties(Duration.ofSeconds(1), limit))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxReasonLength must be between 2 and 1000");
@@ -168,7 +168,7 @@ class AnalysisEventFactoryTest {
 
     @Test
     void eventIdsAreTheSameForTheSameFilingAndDifferPerType() {
-        AnalysisResult empty = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
+        final AnalysisResult empty = new AnalysisResult("1.0", List.of(), RiskLevel.NONE, Map.of());
 
         assertThat(factory.started(FILING_ID, "a").eventId()).isEqualTo(factory.started(FILING_ID, "b").eventId());
         assertThat(List.of(factory.started(FILING_ID, "a").eventId(),
@@ -176,7 +176,7 @@ class AnalysisEventFactoryTest {
                 factory.failed(FILING_ID, "a", "r").eventId())).doesNotHaveDuplicates();
     }
 
-    private static void assertValid(EventEnvelope<?> event) {
+    private static void assertValid(final EventEnvelope<?> event) {
         assertThat(ContractFixtures.validate(event.eventType(), (JsonNode) ContractFixtures.MAPPER.valueToTree(event)))
                 .isEmpty();
     }

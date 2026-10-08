@@ -30,7 +30,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void readsTheStartedExample() {
-        AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_STARTED));
+        final AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_STARTED));
 
         assertThat(event.eventType()).isEqualTo(EventType.ANALYSIS_STARTED);
         assertThat(event.correlationId()).isEqualTo(CORRELATION_ID);
@@ -40,7 +40,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void readsTheCompletedExample() {
-        AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_COMPLETED));
+        final AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_COMPLETED));
 
         assertThat(event.statusUpdate()).isEqualTo(new StatusUpdate(
                 UUID.fromString("6c3c4f56-06d6-393c-96cc-67ed6a106eca"), FILING_ID, FilingStatus.COMPLETED, null));
@@ -48,7 +48,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void readsTheFailedExampleWithItsReason() {
-        AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_FAILED));
+        final AnalysisEvent event = read(Contracts.example(EventType.ANALYSIS_FAILED));
 
         assertThat(event.statusUpdate().target()).isEqualTo(FilingStatus.FAILED);
         assertThat(event.statusUpdate().failureReason()).isEqualTo("Analysis failed after 3 attempts: rule engine error");
@@ -56,8 +56,8 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @EnumSource(value = EventType.class, names = "FILING_SUBMITTED", mode = EnumSource.Mode.EXCLUDE)
-    void ignoresUnknownFieldsInTheEnvelopeAndThePayload(EventType type) {
-        ObjectNode event = Contracts.example(type);
+    void ignoresUnknownFieldsInTheEnvelopeAndThePayload(final EventType type) {
+        final ObjectNode event = Contracts.example(type);
         event.put("addedInNewerVersion", "x");
         event.putObject("nested").put("deep", 1);
         ((ObjectNode) event.get("payload")).put("anotherNewField", 42);
@@ -67,7 +67,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void acceptsTheCurrentEventVersion() {
-        ObjectNode event = Contracts.example(EventType.ANALYSIS_STARTED);
+        final ObjectNode event = Contracts.example(EventType.ANALYSIS_STARTED);
         event.put("eventVersion", EventEnvelope.CURRENT_VERSION);
 
         assertThat(read(event).eventType()).isEqualTo(EventType.ANALYSIS_STARTED);
@@ -76,7 +76,7 @@ class AnalysisEventReaderTest {
     /** Contract, "Event versioning": a newer version goes to the dead-letter queue, it is not guessed at. */
     @ParameterizedTest
     @EnumSource(value = EventType.class, names = "FILING_SUBMITTED", mode = EnumSource.Mode.EXCLUDE)
-    void rejectsANewerEventVersionOfEveryAnalysisEvent(EventType type) {
+    void rejectsANewerEventVersionOfEveryAnalysisEvent(final EventType type) {
         assertInvalid(modified(type, e -> e.put("eventVersion", EventEnvelope.CURRENT_VERSION + 1)),
                 "Unsupported eventVersion 2");
     }
@@ -95,7 +95,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void ignoresAJavaTypeHintAndDispatchesOnEventType() {
-        ObjectNode event = Contracts.example(EventType.ANALYSIS_COMPLETED);
+        final ObjectNode event = Contracts.example(EventType.ANALYSIS_COMPLETED);
         event.put("@class", "com.veritrade.contracts.event.AnalysisFailedPayload");
 
         assertThat(read(event).statusUpdate().target()).isEqualTo(FilingStatus.COMPLETED);
@@ -103,13 +103,13 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"not json", "{", "{\"eventType\":", "\u0000\u0001", "<xml/>"})
-    void rejectsMalformedJson(String body) {
+    void rejectsMalformedJson(final String body) {
         assertInvalid(body.getBytes(StandardCharsets.UTF_8), "not valid JSON");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"[]", "[1,2]", "\"text\"", "42", "null", "true"})
-    void rejectsJsonThatIsNotAnObject(String body) {
+    void rejectsJsonThatIsNotAnObject(final String body) {
         assertInvalid(body.getBytes(StandardCharsets.UTF_8), "not a JSON object");
     }
 
@@ -130,7 +130,7 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"UNKNOWN", "analysis_started", "ANALYSIS_STARTED ", "", "FILING_SUBMITTED"})
-    void rejectsUnknownOrNonAnalysisEventTypes(String eventType) {
+    void rejectsUnknownOrNonAnalysisEventTypes(final String eventType) {
         assertInvalid(modified(EventType.ANALYSIS_STARTED, e -> e.put("eventType", eventType)), "Not an analysis event type");
     }
 
@@ -146,7 +146,7 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"eventId", "correlationId", "occurredAt"})
-    void rejectsAMissingRequiredEnvelopeField(String field) {
+    void rejectsAMissingRequiredEnvelopeField(final String field) {
         assertInvalid(modified(EventType.ANALYSIS_STARTED, e -> e.remove(field)), "Invalid ANALYSIS_STARTED event");
     }
 
@@ -164,7 +164,7 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @EnumSource(value = EventType.class, names = "FILING_SUBMITTED", mode = EnumSource.Mode.EXCLUDE)
-    void rejectsAMissingFilingId(EventType type) {
+    void rejectsAMissingFilingId(final EventType type) {
         assertInvalid(modified(type, e -> ((ObjectNode) e.get("payload")).remove("filingId")), "filingId is missing");
     }
 
@@ -176,21 +176,21 @@ class AnalysisEventReaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "  "})
-    void rejectsABlankFailureReason(String reason) {
+    void rejectsABlankFailureReason(final String reason) {
         assertInvalid(modified(EventType.ANALYSIS_FAILED,
                 e -> ((ObjectNode) e.get("payload")).put("reason", reason)), "reason is missing");
     }
 
     @Test
     void acceptsAFailureReasonOfExactlyTheLimit() {
-        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
+        final String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
 
         assertThat(read(failedWith(reason)).statusUpdate().failureReason()).isEqualTo(reason);
     }
 
     @Test
     void acceptsASurrogatePairThatEndsExactlyAtTheLimit() {
-        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - EMOJI.length()) + EMOJI;
+        final String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - EMOJI.length()) + EMOJI;
 
         assertThat(read(failedWith(reason)).statusUpdate().failureReason()).isEqualTo(reason);
     }
@@ -198,8 +198,8 @@ class AnalysisEventReaderTest {
     /** Contract, "Text limits": the limit counts UTF-16 units, and an over-limit text is not cut but rejected. */
     @ParameterizedTest
     @ValueSource(ints = {1, 2, 1000})
-    void rejectsAFailureReasonOverTheLimitInUtf16Units(int over) {
-        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH + over);
+    void rejectsAFailureReasonOverTheLimitInUtf16Units(final int over) {
+        final String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH + over);
 
         assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class)
                 .hasMessageContaining("payload.reason has " + reason.length() + " UTF-16 units; the limit is 1000");
@@ -207,7 +207,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void rejectsAFailureReasonOverTheLimitOnlyBecauseOfASurrogatePair() {
-        String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - 1) + EMOJI;
+        final String reason = "r".repeat(TestProperties.MAX_FAILURE_REASON_LENGTH - 1) + EMOJI;
 
         assertThat(reason.codePointCount(0, reason.length())).isEqualTo(TestProperties.MAX_FAILURE_REASON_LENGTH);
         assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class);
@@ -215,7 +215,7 @@ class AnalysisEventReaderTest {
 
     @Test
     void rejectsAFailureReasonOfOnlyEmojiOverTheLimit() {
-        String reason = EMOJI.repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
+        final String reason = EMOJI.repeat(TestProperties.MAX_FAILURE_REASON_LENGTH);
 
         assertThatThrownBy(() -> read(failedWith(reason))).isInstanceOf(InvalidEventException.class);
     }
@@ -232,23 +232,23 @@ class AnalysisEventReaderTest {
                 e -> ((ObjectNode) e.get("payload").get("findings").get(0)).put("category", "WEATHER")), "Invalid");
     }
 
-    private static ObjectNode failedWith(String reason) {
-        ObjectNode event = Contracts.example(EventType.ANALYSIS_FAILED);
+    private static ObjectNode failedWith(final String reason) {
+        final ObjectNode event = Contracts.example(EventType.ANALYSIS_FAILED);
         ((ObjectNode) event.get("payload")).put("reason", reason);
         return event;
     }
 
-    private AnalysisEvent read(ObjectNode event) {
+    private AnalysisEvent read(final ObjectNode event) {
         return reader.read(event.toString().getBytes(StandardCharsets.UTF_8));
     }
 
-    private static byte[] modified(EventType type, Consumer<ObjectNode> change) {
-        ObjectNode event = Contracts.example(type);
+    private static byte[] modified(final EventType type, final Consumer<ObjectNode> change) {
+        final ObjectNode event = Contracts.example(type);
         change.accept(event);
         return event.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private void assertInvalid(byte[] body, String message) {
+    private void assertInvalid(final byte[] body, final String message) {
         assertThatThrownBy(() -> reader.read(body)).isInstanceOf(InvalidEventException.class).hasMessageContaining(message);
     }
 }

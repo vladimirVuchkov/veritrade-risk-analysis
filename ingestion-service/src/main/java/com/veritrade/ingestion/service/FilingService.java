@@ -32,8 +32,8 @@ public class FilingService {
     private final Clock clock;
     private final IngestionProperties.ListingLimits listing;
 
-    public FilingService(FilingRepository filings, OutboxService outbox, FilingValidator validator, Clock clock,
-            IngestionProperties properties) {
+    public FilingService(final FilingRepository filings, final OutboxService outbox, final FilingValidator validator, final Clock clock,
+            final IngestionProperties properties) {
         this.filings = filings;
         this.outbox = outbox;
         this.validator = validator;
@@ -43,11 +43,11 @@ public class FilingService {
 
     /** Stores the filing and its {@code filing.submitted} event in one transaction. */
     @Transactional
-    public FilingView submit(FilingSubmission submission, String correlationId) {
+    public FilingView submit(final FilingSubmission submission, final String correlationId) {
         Objects.requireNonNull(correlationId, "correlationId");
-        FilingSubmission valid = validator.validate(submission);
-        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        Filing filing = filings.save(
+        final FilingSubmission valid = validator.validate(submission);
+        final Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        final Filing filing = filings.save(
                 Filing.submit(UUID.randomUUID(), valid.companyName(), valid.title(), valid.content(), now));
         outbox.enqueue(submittedEvent(filing, correlationId));
         log.info("Filing {} submitted", filing.id());
@@ -55,22 +55,22 @@ public class FilingService {
     }
 
     @Transactional(readOnly = true)
-    public FilingView get(UUID filingId) {
+    public FilingView get(final UUID filingId) {
         return filings.findViewById(filingId).orElseThrow(() -> new FilingNotFoundException(filingId));
     }
 
     /** Newest first. A null limit means the default; otherwise it must be between 1 and the maximum. */
     @Transactional(readOnly = true)
-    public List<FilingView> listRecent(Integer limit) {
-        int effective = limit == null ? listing.defaultLimit() : limit;
+    public List<FilingView> listRecent(final Integer limit) {
+        final int effective = limit == null ? listing.defaultLimit() : limit;
         if (effective < 1 || effective > listing.maxLimit()) {
             throw new InvalidRequestException(List.of("limit must be between 1 and " + listing.maxLimit()));
         }
         return filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(effective));
     }
 
-    private static EventEnvelope<FilingSubmittedPayload> submittedEvent(Filing filing, String correlationId) {
-        FilingSubmittedPayload payload = new FilingSubmittedPayload(
+    private static EventEnvelope<FilingSubmittedPayload> submittedEvent(final Filing filing, final String correlationId) {
+        final FilingSubmittedPayload payload = new FilingSubmittedPayload(
                 filing.id(), filing.companyName(), filing.title(), filing.content(), filing.submittedAt());
         return EventEnvelope.of(EventIds.forFiling(filing.id(), EventType.FILING_SUBMITTED),
                 EventType.FILING_SUBMITTED, filing.submittedAt(), correlationId, payload);

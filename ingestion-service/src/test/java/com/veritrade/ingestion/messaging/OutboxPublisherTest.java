@@ -73,8 +73,8 @@ class OutboxPublisherTest {
     void captureSends() {
         when(outbox.maxAttempts()).thenReturn(TestProperties.MAX_ATTEMPTS);
         doAnswer(invocation -> {
-            Message message = invocation.getArgument(2);
-            CorrelationData correlation = invocation.getArgument(3);
+            final Message message = invocation.getArgument(2);
+            final CorrelationData correlation = invocation.getArgument(3);
             sent.add(message);
             correlationIdsInMdc.add(MDC.get(CorrelationIds.MDC_KEY));
             outcomes.getOrDefault(correlation.getId(), OutboxPublisherTest::ack).accept(correlation);
@@ -98,7 +98,7 @@ class OutboxPublisherTest {
 
     @Test
     void sendsRowsInOrderAndMarksEachAfterAPositiveConfirm() {
-        List<OutboxEvent> rows = rows(2);
+        final List<OutboxEvent> rows = rows(2);
         when(outbox.nextBatch()).thenReturn(rows);
 
         publisher.publishPending();
@@ -111,15 +111,15 @@ class OutboxPublisherTest {
 
     @Test
     void sendsToTheEventsExchangeWithTheContractProperties() {
-        OutboxEvent row = rows(1).getFirst();
+        final OutboxEvent row = rows(1).getFirst();
         when(outbox.nextBatch()).thenReturn(List.of(row));
 
         publisher.publishPending();
 
         verify(rabbitTemplate).send(eq("veritrade.events"), eq("filing.submitted"), any(Message.class),
                 any(CorrelationData.class));
-        Message message = sent.getFirst();
-        MessageProperties properties = message.getMessageProperties();
+        final Message message = sent.getFirst();
+        final MessageProperties properties = message.getMessageProperties();
         assertThat(new String(message.getBody(), StandardCharsets.UTF_8)).isEqualTo(row.payload());
         assertThat(properties.getMessageId()).isEqualTo(row.id().toString());
         assertThat(properties.getCorrelationId()).isEqualTo(row.correlationId());
@@ -141,7 +141,7 @@ class OutboxPublisherTest {
 
     @Test
     void negativeConfirmKeepsTheRowAndStopsSoLaterRowsKeepTheirOrder() {
-        List<OutboxEvent> rows = rows(3);
+        final List<OutboxEvent> rows = rows(3);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.get(1).id().toString(), c -> c.getFuture().complete(new CorrelationData.Confirm(false, "nack")));
 
@@ -155,7 +155,7 @@ class OutboxPublisherTest {
 
     @Test
     void returnedMessageKeepsTheRowEvenWithAPositiveConfirm() {
-        List<OutboxEvent> rows = rows(2);
+        final List<OutboxEvent> rows = rows(2);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.get(0).id().toString(), c -> {
             c.setReturned(new ReturnedMessage(new Message(new byte[0]), 312, "NO_ROUTE", "veritrade.events",
@@ -171,7 +171,7 @@ class OutboxPublisherTest {
 
     @Test
     void missingConfirmWithinTheTimeoutKeepsTheRow() {
-        List<OutboxEvent> rows = rows(1);
+        final List<OutboxEvent> rows = rows(1);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(), c -> { });
 
@@ -182,7 +182,7 @@ class OutboxPublisherTest {
 
     @Test
     void failedConfirmFutureKeepsTheRow() {
-        List<OutboxEvent> rows = rows(1);
+        final List<OutboxEvent> rows = rows(1);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(),
                 c -> c.getFuture().completeExceptionally(new IllegalStateException("channel closed")));
@@ -194,7 +194,7 @@ class OutboxPublisherTest {
 
     @Test
     void brokerUnavailableKeepsTheRowAndStops() {
-        List<OutboxEvent> rows = rows(2);
+        final List<OutboxEvent> rows = rows(2);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(), c -> {
             throw new AmqpConnectException(new java.net.ConnectException("refused"));
@@ -209,7 +209,7 @@ class OutboxPublisherTest {
 
     @Test
     void interruptionKeepsTheRowAndRestoresTheInterruptFlag() {
-        List<OutboxEvent> rows = rows(1);
+        final List<OutboxEvent> rows = rows(1);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(), c -> Thread.currentThread().interrupt());
 
@@ -221,8 +221,8 @@ class OutboxPublisherTest {
 
     @Test
     void keepsReadingWhileBatchesAreFull() {
-        List<OutboxEvent> full = rows(BATCH_SIZE);
-        List<OutboxEvent> rest = rows(1);
+        final List<OutboxEvent> full = rows(BATCH_SIZE);
+        final List<OutboxEvent> rest = rows(1);
         when(outbox.nextBatch()).thenReturn(full, rest);
 
         publisher.publishPending();
@@ -233,7 +233,7 @@ class OutboxPublisherTest {
 
     @Test
     void doesNotReadAgainAfterAFailureInAFullBatch() {
-        List<OutboxEvent> full = rows(BATCH_SIZE);
+        final List<OutboxEvent> full = rows(BATCH_SIZE);
         when(outbox.nextBatch()).thenReturn(full);
         outcomes.put(full.getLast().id().toString(), c -> c.getFuture().complete(new CorrelationData.Confirm(false, "nack")));
 
@@ -253,8 +253,8 @@ class OutboxPublisherTest {
 
     @ParameterizedTest
     @MethodSource("failuresOfTheMessage")
-    void failureOfTheMessageIsCountedAndStopsTheRunWhileAttemptsRemain(RuntimeException failure) {
-        List<OutboxEvent> rows = rows(2);
+    void failureOfTheMessageIsCountedAndStopsTheRunWhileAttemptsRemain(final RuntimeException failure) {
+        final List<OutboxEvent> rows = rows(2);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(), c -> {
             throw failure;
@@ -269,8 +269,8 @@ class OutboxPublisherTest {
     }
 
     @Test
-    void parkedRowIsSkippedAndTheRowsAfterItArePublishedInOrder(CapturedOutput output) {
-        List<OutboxEvent> rows = rows(BATCH_SIZE);
+    void parkedRowIsSkippedAndTheRowsAfterItArePublishedInOrder(final CapturedOutput output) {
+        final List<OutboxEvent> rows = rows(BATCH_SIZE);
         when(outbox.nextBatch()).thenReturn(rows, List.of());
         when(outbox.recordFailedAttempt(eq(rows.get(1).id()), anyString())).thenReturn(true);
         outcomes.put(rows.get(1).id().toString(), c -> {
@@ -301,8 +301,8 @@ class OutboxPublisherTest {
 
     @ParameterizedTest
     @MethodSource("brokerFailures")
-    void brokerFailureIsNeverCountedAgainstTheRow(RuntimeException failure) {
-        List<OutboxEvent> rows = rows(2);
+    void brokerFailureIsNeverCountedAgainstTheRow(final RuntimeException failure) {
+        final List<OutboxEvent> rows = rows(2);
         when(outbox.nextBatch()).thenReturn(rows);
         outcomes.put(rows.getFirst().id().toString(), c -> {
             throw failure;
@@ -320,10 +320,10 @@ class OutboxPublisherTest {
 
     @Test
     void confirmFailuresAreNeverCountedAgainstTheRow() {
-        List<OutboxEvent> rows = rows(1);
+        final List<OutboxEvent> rows = rows(1);
         when(outbox.nextBatch()).thenReturn(rows);
-        String id = rows.getFirst().id().toString();
-        List<Consumer<CorrelationData>> confirmFailures = List.of(
+        final String id = rows.getFirst().id().toString();
+        final List<Consumer<CorrelationData>> confirmFailures = List.of(
                 c -> c.getFuture().complete(new CorrelationData.Confirm(false, "nack")),
                 c -> {
                     c.setReturned(new ReturnedMessage(new Message(new byte[0]), 312, "NO_ROUTE", "veritrade.events",
@@ -346,11 +346,11 @@ class OutboxPublisherTest {
     /** Review W3-07: a failed run must not reload every pending payload on each scheduler tick. */
     @Test
     void readsTheOutboxAgainOnlyAfterAnExponentialBackoffWhileRunsFail() {
-        OutboxPublisher publisher = withBackoff();
+        final OutboxPublisher publisher = withBackoff();
         when(outbox.nextBatch()).thenReturn(rows(1));
         rejectEverySend();
 
-        List<Duration> reads = readTimes(publisher, Duration.ofSeconds(15));
+        final List<Duration> reads = readTimes(publisher, Duration.ofSeconds(15));
 
         assertThat(reads).containsExactly(Duration.ZERO, Duration.ofSeconds(1), Duration.ofSeconds(3),
                 Duration.ofSeconds(7), Duration.ofSeconds(11), Duration.ofSeconds(15));
@@ -358,7 +358,7 @@ class OutboxPublisherTest {
 
     @Test
     void aSuccessfulRunResetsTheBackoff() {
-        OutboxPublisher publisher = withBackoff();
+        final OutboxPublisher publisher = withBackoff();
         when(outbox.nextBatch()).thenReturn(rows(1));
         rejectEverySend();
         publisher.publishPending();
@@ -389,8 +389,8 @@ class OutboxPublisherTest {
 
     @Test
     void aParkedRowDoesNotStartABackoff() {
-        OutboxPublisher publisher = withBackoff();
-        List<OutboxEvent> rows = rows(1);
+        final OutboxPublisher publisher = withBackoff();
+        final List<OutboxEvent> rows = rows(1);
         when(outbox.nextBatch()).thenReturn(rows);
         when(outbox.recordFailedAttempt(any(), anyString())).thenReturn(true);
         outcomes.put(rows.getFirst().id().toString(), c -> {
@@ -406,10 +406,10 @@ class OutboxPublisherTest {
     }
 
     /** Calls the publisher on every scheduler tick for {@code total}; returns the offsets at which it read the outbox. */
-    private List<Duration> readTimes(OutboxPublisher publisher, Duration total) {
-        List<Duration> reads = new ArrayList<>();
+    private List<Duration> readTimes(final OutboxPublisher publisher, final Duration total) {
+        final List<Duration> reads = new ArrayList<>();
         for (Duration offset = Duration.ZERO; offset.compareTo(total) <= 0; offset = offset.plus(TICK)) {
-            long before = outboxReads();
+            final long before = outboxReads();
             publisher.publishPending();
             if (outboxReads() > before) {
                 reads.add(offset);
@@ -439,12 +439,12 @@ class OutboxPublisherTest {
         }).when(rabbitTemplate).send(anyString(), anyString(), any(Message.class), any(CorrelationData.class));
     }
 
-    private static void ack(CorrelationData correlation) {
+    private static void ack(final CorrelationData correlation) {
         correlation.getFuture().complete(new CorrelationData.Confirm(true, null));
     }
 
-    private static List<OutboxEvent> rows(int count) {
-        List<OutboxEvent> rows = new ArrayList<>();
+    private static List<OutboxEvent> rows(final int count) {
+        final List<OutboxEvent> rows = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             rows.add(new OutboxEvent(UUID.randomUUID(), "filing.submitted", "corr-" + i,
                     "{\"n\":" + i + "}", CREATED.plusSeconds(i)));

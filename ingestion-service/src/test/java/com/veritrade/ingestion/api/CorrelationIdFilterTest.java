@@ -27,7 +27,7 @@ class CorrelationIdFilterTest {
 
     @Test
     void keepsTheCorrelationIdOfTheRequest() throws Exception {
-        Result result = filter("abc-123");
+        final Result result = filter("abc-123");
 
         assertThat(result.attribute()).isEqualTo("abc-123");
         assertThat(result.header()).isEqualTo("abc-123");
@@ -41,21 +41,21 @@ class CorrelationIdFilterTest {
 
     @Test
     void keepsAnIdOfExactlyTheMaximumLength() throws Exception {
-        String id = "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH);
+        final String id = "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH);
 
         assertThat(filter(id).header()).isEqualTo(id);
     }
 
     @Test
     void replacesAnIdOverTheMaximumLength() throws Exception {
-        String id = "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH + 1);
+        final String id = "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH + 1);
 
         assertGenerated(filter(id));
     }
 
     @Test
     void keepsEveryAllowedCharacterClass() throws Exception {
-        String id = "AZaz09._:-" + "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH - 10);
+        final String id = "AZaz09._:-" + "x".repeat(TestProperties.MAX_CORRELATION_ID_LENGTH - 10);
 
         assertThat(filter(id).header()).isEqualTo(id);
     }
@@ -68,13 +68,13 @@ class CorrelationIdFilterTest {
     @ValueSource(strings = {
             "\u00c3\u00a9\u00c3\u00a9\u00c3\u00a9", "\u00e9t\u00e9", "\u6ce8\u6587", "\ud83d\udcc8",
             "abc\u00a0def", "caf\u00e9-123"})
-    void replacesANonAsciiId(String id) throws Exception {
+    void replacesANonAsciiId(final String id) throws Exception {
         assertGenerated(filter(id));
     }
 
     @Test
     void replacesTheIdThatBlockedTheOutbox() throws Exception {
-        String decodedByTomcat = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+        final String decodedByTomcat = new String("\u00e9".repeat(64).getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
 
         assertThat(decodedByTomcat).hasSize(TestProperties.MAX_CORRELATION_ID_LENGTH);
         assertGenerated(filter(decodedByTomcat));
@@ -83,19 +83,19 @@ class CorrelationIdFilterTest {
     @ParameterizedTest
     @ValueSource(strings = {"abc\u0000def", "abc\u0007def", "abc\u001bdef", "abc\u007fdef", "abc\ndef", "abc\rdef",
             "abc\tdef"})
-    void replacesAnIdWithControlCharacters(String id) throws Exception {
+    void replacesAnIdWithControlCharacters(final String id) throws Exception {
         assertGenerated(filter(id));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"abc def", "abc  def", " a b "})
-    void replacesAnIdWithInnerSpaces(String id) throws Exception {
+    void replacesAnIdWithInnerSpaces(final String id) throws Exception {
         assertGenerated(filter(id));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"abc/def", "a;b", "a,b", "<script>", "a\"b", "a=b", "a+b", "{id}", "a%20b"})
-    void replacesAnIdWithOtherPunctuation(String id) throws Exception {
+    void replacesAnIdWithOtherPunctuation(final String id) throws Exception {
         assertGenerated(filter(id));
     }
 
@@ -106,7 +106,7 @@ class CorrelationIdFilterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "\t"})
-    void generatesAnIdWhenTheHeaderIsBlank(String header) throws Exception {
+    void generatesAnIdWhenTheHeaderIsBlank(final String header) throws Exception {
         assertGenerated(filter(header));
     }
 
@@ -117,10 +117,10 @@ class CorrelationIdFilterTest {
 
     @Test
     void clearsTheLoggingContextEvenWhenTheRequestFails() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        MockFilterChain failing = new MockFilterChain(new HttpServlet() {
+        final MockHttpServletRequest request = new MockHttpServletRequest();
+        final MockFilterChain failing = new MockFilterChain(new HttpServlet() {
             @Override
-            protected void service(HttpServletRequest req, HttpServletResponse res) throws ServletException {
+            protected void service(final HttpServletRequest req, final HttpServletResponse res) throws ServletException {
                 throw new ServletException("boom");
             }
         });
@@ -130,19 +130,19 @@ class CorrelationIdFilterTest {
         assertThat(MDC.get(CorrelationIds.MDC_KEY)).isNull();
     }
 
-    private static void assertGenerated(Result result) {
+    private static void assertGenerated(final Result result) {
         assertThat(UUID.fromString(result.header())).isNotNull();
         assertThat(result.attribute()).isEqualTo(result.header());
         assertThat(result.mdcDuringRequest()).isEqualTo(result.header());
     }
 
-    private Result filter(String header) throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+    private Result filter(final String header) throws ServletException, IOException {
+        final MockHttpServletRequest request = new MockHttpServletRequest();
         if (header != null) {
             request.addHeader(CorrelationIds.HTTP_HEADER, header);
         }
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicReference<String> mdc = new AtomicReference<>();
+        final MockHttpServletResponse response = new MockHttpServletResponse();
+        final AtomicReference<String> mdc = new AtomicReference<>();
         filter.doFilter(request, response, (req, res) -> mdc.set(MDC.get(CorrelationIds.MDC_KEY)));
         assertThat(MDC.get(CorrelationIds.MDC_KEY)).isNull();
         return new Result((String) request.getAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE),

@@ -28,28 +28,28 @@ public class FilingController {
 
     private final FilingService filingService;
 
-    public FilingController(FilingService filingService) {
+    public FilingController(final FilingService filingService) {
         this.filingService = filingService;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<SubmitFilingResponse> submit(
-            @RequestBody SubmitFilingRequest request,
-            @RequestAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE) String correlationId) {
-        FilingView filing = filingService.submit(request.toSubmission(), correlationId);
-        URI location = UriComponentsBuilder.fromPath(BASE_PATH).path("/{id}").buildAndExpand(filing.id()).toUri();
+            @RequestBody final SubmitFilingRequest request,
+            @RequestAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE) final String correlationId) {
+        final FilingView filing = filingService.submit(request.toSubmission(), correlationId);
+        final URI location = UriComponentsBuilder.fromPath(BASE_PATH).path("/{id}").buildAndExpand(filing.id()).toUri();
         return ResponseEntity.accepted()
                 .location(location)
                 .body(new SubmitFilingResponse(filing.id(), filing.status()));
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public List<FilingStatusResponse> list(@RequestParam(required = false) Integer limit) {
+    public List<FilingStatusResponse> list(@RequestParam(required = false) final Integer limit) {
         return filingService.listRecent(limit).stream().map(FilingStatusResponse::from).toList();
     }
 
     @GetMapping(path = "/{filingId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public FilingStatusResponse get(@PathVariable UUID filingId) {
+    public FilingStatusResponse get(@PathVariable final UUID filingId) {
         return FilingStatusResponse.from(filingService.get(filingId));
     }
 }

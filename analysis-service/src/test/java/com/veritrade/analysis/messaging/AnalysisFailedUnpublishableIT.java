@@ -72,7 +72,7 @@ class AnalysisFailedUnpublishableIT extends RabbitIntegrationTest {
     void refuseAnalysisFailed() {
         admin.removeBinding(CAPTURE_ALL);
         CAPTURE_STARTED_AND_COMPLETED.forEach(admin::declareBinding);
-        Queue full = QueueBuilder.durable(FULL_QUEUE).maxLength(0).overflow(QueueBuilder.Overflow.rejectPublish).build();
+        final Queue full = QueueBuilder.durable(FULL_QUEUE).maxLength(0).overflow(QueueBuilder.Overflow.rejectPublish).build();
         admin.declareQueue(full);
         admin.declareBinding(BindingBuilder.bind(full).to(EVENTS).with(EventType.ANALYSIS_FAILED.routingKey()));
     }
@@ -87,12 +87,12 @@ class AnalysisFailedUnpublishableIT extends RabbitIntegrationTest {
     @Test
     void deadLettersTheFilingWhenAnalysisFailedIsNackedAndKeepsConsuming() {
         when(analyzer.analyze(anyString())).thenThrow(new IllegalStateException("rule engine error"));
-        UUID filingId = UUID.randomUUID();
-        ObjectNode filing = filingSubmitted(filingId);
+        final UUID filingId = UUID.randomUUID();
+        final ObjectNode filing = filingSubmitted(filingId);
 
         sendFilingSubmitted(filing.toString());
 
-        Message dead = receive(DEAD_LETTER_QUEUE);
+        final Message dead = receive(DEAD_LETTER_QUEUE);
         assertThat(json(dead)).isEqualTo(filing);
         assertRejectedOnce(dead);
         verify(analyzer, times(attempts())).analyze(anyString());
@@ -109,7 +109,7 @@ class AnalysisFailedUnpublishableIT extends RabbitIntegrationTest {
 
     @Test
     void waitsTheConfiguredExponentialBackoffBetweenAttempts() {
-        List<Long> attemptTimes = new CopyOnWriteArrayList<>();
+        final List<Long> attemptTimes = new CopyOnWriteArrayList<>();
         when(analyzer.analyze(anyString())).thenAnswer(invocation -> {
             attemptTimes.add(System.nanoTime());
             throw new IllegalStateException("rule engine error");
@@ -120,15 +120,15 @@ class AnalysisFailedUnpublishableIT extends RabbitIntegrationTest {
         receive(DEAD_LETTER_QUEUE);
         assertThat(attemptTimes).hasSize(attempts());
         for (int retry = 1; retry < attempts(); retry++) {
-            Duration gap = Duration.ofNanos(attemptTimes.get(retry) - attemptTimes.get(retry - 1));
+            final Duration gap = Duration.ofNanos(attemptTimes.get(retry) - attemptTimes.get(retry - 1));
             assertThat(gap).as("pause before retry %d", retry).isGreaterThanOrEqualTo(expectedDelay(retry));
         }
     }
 
     private void assertTheNextValidFilingIsAnalysed() {
-        RiskAnalyzer real = TestMessages.bundledAnalyzer();
+        final RiskAnalyzer real = TestMessages.bundledAnalyzer();
         doAnswer(invocation -> real.analyze(invocation.getArgument(0))).when(analyzer).analyze(anyString());
-        UUID next = UUID.randomUUID();
+        final UUID next = UUID.randomUUID();
 
         sendFilingSubmitted(filingSubmitted(next).toString());
 
@@ -145,17 +145,17 @@ class AnalysisFailedUnpublishableIT extends RabbitIntegrationTest {
 
     /** The pause before the given retry (1-based): initial interval times multiplier^(retry - 1), capped. */
     private Duration expectedDelay(int retry) {
-        long millis = (long) (initialInterval.toMillis() * Math.pow(multiplier, retry - 1));
+        final long millis = (long) (initialInterval.toMillis() * Math.pow(multiplier, retry - 1));
         return Duration.ofMillis(Math.min(millis, maxInterval.toMillis()));
     }
 
-    private static Binding captureBinding(String routingKey) {
+    private static Binding captureBinding(final String routingKey) {
         return BindingBuilder.bind(new Queue(CAPTURE_QUEUE)).to(EVENTS).with(routingKey);
     }
 
     @SuppressWarnings("unchecked")
-    private static void assertRejectedOnce(Message dead) {
-        List<Map<String, Object>> deaths =
+    private static void assertRejectedOnce(final Message dead) {
+        final List<Map<String, Object>> deaths =
                 (List<Map<String, Object>>) dead.getMessageProperties().getHeaders().get("x-death");
         assertThat(deaths).singleElement().satisfies(death -> {
             assertThat(death.get("queue")).isEqualTo(MessagingTopology.Q_ANALYSIS_FILING_SUBMITTED);

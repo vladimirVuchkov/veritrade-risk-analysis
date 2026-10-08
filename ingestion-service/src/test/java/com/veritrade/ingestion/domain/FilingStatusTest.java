@@ -36,7 +36,7 @@ class FilingStatusTest {
 
     @ParameterizedTest(name = "{0} -> {1} allowed: {2}")
     @MethodSource("everyPair")
-    void allowsOnlyForwardMovesBeforeAFinalStatus(FilingStatus from, FilingStatus to, boolean allowed) {
+    void allowsOnlyForwardMovesBeforeAFinalStatus(final FilingStatus from, final FilingStatus to, final boolean allowed) {
         assertThat(from.canMoveTo(to)).isEqualTo(allowed);
     }
 
@@ -62,20 +62,20 @@ class FilingStatusTest {
 
     @ParameterizedTest(name = "{0} -> {1}: {2}")
     @MethodSource("everyChange")
-    void classifiesEveryRequestedChange(FilingStatus from, FilingStatus to, StatusChange expected) {
+    void classifiesEveryRequestedChange(final FilingStatus from, final FilingStatus to, final StatusChange expected) {
         assertThat(from.transitionTo(to)).isEqualTo(expected);
     }
 
     @ParameterizedTest
     @EnumSource(value = FilingStatus.class, names = "FAILED", mode = EnumSource.Mode.EXCLUDE)
-    void onlyFailedKeepsAFailureReason(FilingStatus status) {
+    void onlyFailedKeepsAFailureReason(final FilingStatus status) {
         assertThat(status.failureReasonToKeep("rule engine error")).isNull();
         assertThat(FAILED.failureReasonToKeep("rule engine error")).isEqualTo("rule engine error");
     }
 
     @ParameterizedTest
     @MethodSource("terminalFlags")
-    void onlyCompletedAndFailedAreFinal(FilingStatus status, boolean terminal) {
+    void onlyCompletedAndFailedAreFinal(final FilingStatus status, final boolean terminal) {
         assertThat(status.isTerminal()).isEqualTo(terminal);
     }
 

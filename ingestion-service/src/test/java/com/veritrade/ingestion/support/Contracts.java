@@ -28,51 +28,51 @@ public final class Contracts {
     }
 
     /** Schema validation errors of {@code json} against the schema of {@code type}; empty when valid. */
-    public static List<Error> validate(EventType type, String json) {
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + fileStem(type) + ".schema.json"));
+    public static List<Error> validate(final EventType type, final String json) {
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + fileStem(type) + ".schema.json"));
         return schema.validate(MAPPER.readTree(json));
     }
 
-    public static List<Error> validateEnvelope(String json) {
-        Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + "event-envelope.schema.json"));
+    public static List<Error> validateEnvelope(final String json) {
+        final Schema schema = SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_BASE + "event-envelope.schema.json"));
         return schema.validate(MAPPER.readTree(json));
     }
 
     /** A fresh, mutable copy of the example event of {@code type}. */
-    public static ObjectNode example(EventType type) {
+    public static ObjectNode example(final EventType type) {
         try (InputStream in = Contracts.class.getClassLoader()
                 .getResourceAsStream("contracts/examples/" + fileStem(type) + ".json")) {
             if (in == null) {
                 throw new IllegalStateException("Missing example for " + type);
             }
             return (ObjectNode) MAPPER.readTree(in);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /** The example file of {@code type}, byte for byte. */
-    public static byte[] exampleBytes(EventType type) {
+    public static byte[] exampleBytes(final EventType type) {
         try (InputStream in = Contracts.class.getClassLoader()
                 .getResourceAsStream("contracts/examples/" + fileStem(type) + ".json")) {
             if (in == null) {
                 throw new IllegalStateException("Missing example for " + type);
             }
             return in.readAllBytes();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /** The example event of {@code type}, rewritten for another filing (with its deterministic event id). */
-    public static ObjectNode exampleFor(EventType type, UUID filingId) {
-        ObjectNode event = example(type);
+    public static ObjectNode exampleFor(final EventType type, final UUID filingId) {
+        final ObjectNode event = example(type);
         event.put("eventId", EventIds.forFiling(filingId, type).toString());
         ((ObjectNode) event.get("payload")).put("filingId", filingId.toString());
         return event;
     }
 
-    private static String fileStem(EventType type) {
+    private static String fileStem(final EventType type) {
         return type.name().toLowerCase().replace('_', '-');
     }
 }

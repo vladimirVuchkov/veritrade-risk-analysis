@@ -14,8 +14,8 @@ public final class EventIds {
     private EventIds() {
     }
 
-    public static UUID forFiling(UUID filingId, EventType eventType) {
-        String name = filingId + ":" + eventType.name();
+    public static UUID forFiling(final UUID filingId, final EventType eventType) {
+        final String name = filingId + ":" + eventType.name();
         return UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8));
     }
 }

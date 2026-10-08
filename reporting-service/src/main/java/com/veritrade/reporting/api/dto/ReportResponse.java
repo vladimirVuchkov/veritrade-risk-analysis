@@ -17,8 +17,8 @@ public record ReportResponse(
         ReportSummaryResponse summary,
         List<FindingResponse> findings) {
 
-    public static ReportResponse from(ReportView view) {
-        Report report = view.report();
+    public static ReportResponse from(final ReportView view) {
+        final Report report = view.report();
         return new ReportResponse(
                 report.getFilingId(),
                 report.getStatus(),
@@ -29,8 +29,8 @@ public record ReportResponse(
                 view.findings().stream().map(FindingResponse::from).toList());
     }
 
-    private static ReportSummaryResponse summaryOf(ReportView view) {
-        Report report = view.report();
+    private static ReportSummaryResponse summaryOf(final ReportView view) {
+        final Report report = view.report();
         if (report.getStatus() == ReportStatus.FAILED) {
             return null;
         }

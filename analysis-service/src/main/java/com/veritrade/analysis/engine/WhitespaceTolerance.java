@@ -25,12 +25,12 @@ final class WhitespaceTolerance {
     }
 
     /** The whitespace-tolerant form of {@code regex}; throws if a space cannot be rewritten safely. */
-    static String rewrite(String regex) {
-        StringBuilder out = new StringBuilder(regex.length() + 16);
+    static String rewrite(final String regex) {
+        final StringBuilder out = new StringBuilder(regex.length() + 16);
         int classDepth = 0;
         int i = 0;
         while (i < regex.length()) {
-            char c = regex.charAt(i);
+            final char c = regex.charAt(i);
             if (c == '\\') {
                 i = copyEscape(regex, i, out);
             } else if (c == ' ') {
@@ -45,11 +45,11 @@ final class WhitespaceTolerance {
         return out.toString();
     }
 
-    private static int copyEscape(String regex, int backslash, StringBuilder out) {
+    private static int copyEscape(final String regex, final int backslash, final StringBuilder out) {
         if (regex.startsWith("\\Q", backslash)) {
-            int end = regex.indexOf(QUOTE_END, backslash);
-            int stop = end < 0 ? regex.length() : end + QUOTE_END.length();
-            String quoted = regex.substring(backslash, stop);
+            final int end = regex.indexOf(QUOTE_END, backslash);
+            final int stop = end < 0 ? regex.length() : end + QUOTE_END.length();
+            final String quoted = regex.substring(backslash, stop);
             if (quoted.indexOf(' ') >= 0) {
                 throw new IllegalArgumentException("a space inside \\Q...\\E would not match line breaks; "
                         + "write the phrase without the quote");
@@ -57,7 +57,7 @@ final class WhitespaceTolerance {
             out.append(quoted);
             return stop;
         }
-        int stop = Math.min(backslash + 2, regex.length());
+        final int stop = Math.min(backslash + 2, regex.length());
         out.append(regex, backslash, stop);
         return stop;
     }
@@ -69,12 +69,12 @@ final class WhitespaceTolerance {
         }
     }
 
-    private static int appendWhitespaceRun(String regex, int start, StringBuilder out) {
+    private static int appendWhitespaceRun(final String regex, final int start, final StringBuilder out) {
         int end = start;
         while (end < regex.length() && regex.charAt(end) == ' ') {
             end++;
         }
-        boolean quantified = end < regex.length() && QUANTIFIERS.contains(regex.charAt(end));
+        final boolean quantified = end < regex.length() && QUANTIFIERS.contains(regex.charAt(end));
         out.append(quantified ? "(?:" + WHITESPACE_RUN + ")" : WHITESPACE_RUN);
         return end;
     }

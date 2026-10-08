@@ -14,7 +14,7 @@ public record FilingStatusResponse(
         Instant submittedAt,
         String failureReason) {
 
-    public static FilingStatusResponse from(FilingView view) {
+    public static FilingStatusResponse from(final FilingView view) {
         return new FilingStatusResponse(view.id(), view.companyName(), view.title(), view.status(),
                 view.submittedAt(), view.failureReason());
     }

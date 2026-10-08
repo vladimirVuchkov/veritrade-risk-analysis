@@ -51,7 +51,7 @@ public class FindingEntity {
     }
 
     public FindingEntity(
-            RiskCategory category, Severity severity, String ruleId, String matchedText, String excerpt, int position) {
+            final RiskCategory category, final Severity severity, final String ruleId, final String matchedText, final String excerpt, final int position) {
         this.category = category;
         this.severity = severity;
         this.ruleId = ruleId;
@@ -60,7 +60,7 @@ public class FindingEntity {
         this.position = position;
     }
 
-    void attachTo(Report owner) {
+    void attachTo(final Report owner) {
         this.report = owner;
     }
 

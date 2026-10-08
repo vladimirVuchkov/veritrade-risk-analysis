@@ -24,20 +24,20 @@ public class EngineConfig {
     private static final Logger log = LoggerFactory.getLogger(EngineConfig.class);
 
     @Bean
-    RuleSet ruleSet(RulesProperties properties) {
-        Resource location = properties.location();
+    RuleSet ruleSet(final RulesProperties properties) {
+        final Resource location = properties.location();
         try (InputStream in = location.getInputStream()) {
-            RuleSet ruleSet = new RuleLoader().load(in, location.getDescription());
+            final RuleSet ruleSet = new RuleLoader().load(in, location.getDescription());
             log.info("Loaded {} risk rules, version {}, from {}",
                     ruleSet.rules().size(), ruleSet.rulesVersion(), location.getDescription());
             return ruleSet;
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException("Cannot read the risk rules from " + location.getDescription(), e);
         }
     }
 
     @Bean
-    RiskAnalyzer riskAnalyzer(RuleSet ruleSet, RulesProperties properties) {
+    RiskAnalyzer riskAnalyzer(final RuleSet ruleSet, final RulesProperties properties) {
         return new RiskAnalyzer(
                 ruleSet,
                 new RuleMatcher(properties.maxMatchesPerRule(), properties.maxMatchedTextChars()),

@@ -44,7 +44,7 @@ class FilingServiceTest {
     void storesTheFilingAsSubmittedWithTimestampInMicroseconds() {
         when(filings.save(any(Filing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        FilingView view = service.submit(new FilingSubmission(" Acme ", "10-K", "text"), "corr-1");
+        final FilingView view = service.submit(new FilingSubmission(" Acme ", "10-K", "text"), "corr-1");
 
         assertThat(view.status()).isEqualTo(FilingStatus.SUBMITTED);
         assertThat(view.companyName()).isEqualTo("Acme");
@@ -56,9 +56,9 @@ class FilingServiceTest {
     void enqueuesTheFilingSubmittedEventForTheSameFiling() {
         when(filings.save(any(Filing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        FilingView view = service.submit(new FilingSubmission("Acme", "10-K", "text"), "corr-1");
+        final FilingView view = service.submit(new FilingSubmission("Acme", "10-K", "text"), "corr-1");
 
-        EventEnvelope<?> envelope = capturedEnvelope();
+        final EventEnvelope<?> envelope = capturedEnvelope();
         assertThat(envelope.eventId()).isEqualTo(EventIds.forFiling(view.id(), EventType.FILING_SUBMITTED));
         assertThat(envelope.eventType()).isEqualTo(EventType.FILING_SUBMITTED);
         assertThat(envelope.eventVersion()).isEqualTo(EventEnvelope.CURRENT_VERSION);
@@ -84,8 +84,8 @@ class FilingServiceTest {
 
     @Test
     void returnsAKnownFiling() {
-        UUID id = UUID.randomUUID();
-        FilingView view = new FilingView(id, "Acme", "10-K", FilingStatus.ANALYZING, NOW, null);
+        final UUID id = UUID.randomUUID();
+        final FilingView view = new FilingView(id, "Acme", "10-K", FilingStatus.ANALYZING, NOW, null);
         when(filings.findViewById(id)).thenReturn(Optional.of(view));
 
         assertThat(service.get(id)).isEqualTo(view);
@@ -93,7 +93,7 @@ class FilingServiceTest {
 
     @Test
     void failsForAnUnknownFiling() {
-        UUID id = UUID.randomUUID();
+        final UUID id = UUID.randomUUID();
         when(filings.findViewById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(id))
@@ -110,8 +110,8 @@ class FilingServiceTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 2, 20, 99, 100})
-    void acceptsLimitsFromOneToTheMaximum(int limit) {
-        List<FilingView> expected = List.of(new FilingView(UUID.randomUUID(), "Acme", "10-K", FilingStatus.SUBMITTED, NOW, null));
+    void acceptsLimitsFromOneToTheMaximum(final int limit) {
+        final List<FilingView> expected = List.of(new FilingView(UUID.randomUUID(), "Acme", "10-K", FilingStatus.SUBMITTED, NOW, null));
         when(filings.findAllByOrderBySubmittedAtDescIdDesc(Limit.of(limit))).thenReturn(expected);
 
         assertThat(service.listRecent(limit)).isEqualTo(expected);
@@ -119,7 +119,7 @@ class FilingServiceTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, -1, -100, 101, 1000, Integer.MIN_VALUE, Integer.MAX_VALUE})
-    void rejectsLimitsOutsideTheRange(int limit) {
+    void rejectsLimitsOutsideTheRange(final int limit) {
         assertThatThrownBy(() -> service.listRecent(limit))
                 .isInstanceOfSatisfying(InvalidRequestException.class,
                         e -> assertThat(e.errors()).containsExactly("limit must be between 1 and 100"));
@@ -127,7 +127,7 @@ class FilingServiceTest {
     }
 
     private EventEnvelope<?> capturedEnvelope() {
-        ArgumentCaptor<EventEnvelope<?>> captor = ArgumentCaptor.captor();
+        final ArgumentCaptor<EventEnvelope<?>> captor = ArgumentCaptor.captor();
         verify(outbox).enqueue(captor.capture());
         return captor.getValue();
     }

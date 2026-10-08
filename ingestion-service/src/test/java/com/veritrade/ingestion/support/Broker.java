@@ -25,7 +25,7 @@ public final class Broker {
         return new RabbitMQContainer(IMAGE);
     }
 
-    public static Message json(String body, String messageId) {
+    public static Message json(final String body, final String messageId) {
         return MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setMessageId(messageId)
@@ -33,10 +33,10 @@ public final class Broker {
     }
 
     /** Receives from {@code queue} until a message matches, dropping the others; null when none arrives in time. */
-    public static Message receiveMatching(RabbitTemplate template, String queue, Predicate<Message> match, Duration timeout) {
-        Instant deadline = Instant.now().plus(timeout);
+    public static Message receiveMatching(final RabbitTemplate template, final String queue, final Predicate<Message> match, final Duration timeout) {
+        final Instant deadline = Instant.now().plus(timeout);
         while (Instant.now().isBefore(deadline)) {
-            Message message = template.receive(queue, POLL.toMillis());
+            final Message message = template.receive(queue, POLL.toMillis());
             if (message != null && match.test(message)) {
                 return message;
             }
@@ -44,7 +44,7 @@ public final class Broker {
         return null;
     }
 
-    public static Predicate<Message> withMessageId(Object id) {
+    public static Predicate<Message> withMessageId(final Object id) {
         return message -> id.toString().equals(message.getMessageProperties().getMessageId());
     }
 }

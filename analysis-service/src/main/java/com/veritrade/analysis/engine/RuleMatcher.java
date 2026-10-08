@@ -22,7 +22,7 @@ public final class RuleMatcher {
     private final int maxMatchesPerRule;
     private final int maxMatchLength;
 
-    public RuleMatcher(int maxMatchesPerRule, int maxMatchLength) {
+    public RuleMatcher(final int maxMatchesPerRule, final int maxMatchLength) {
         if (maxMatchesPerRule < 1) {
             throw new IllegalArgumentException("maxMatchesPerRule must be >= 1, was " + maxMatchesPerRule);
         }
@@ -35,17 +35,17 @@ public final class RuleMatcher {
     }
 
     /** Non-overlapping matches of the rule, earliest first, at most {@code maxMatchesPerRule}. */
-    public List<Match> findMatches(RiskRule rule, CharSequence text) {
-        List<Match> candidates = new ArrayList<>();
-        for (Pattern pattern : rule.patterns()) {
+    public List<Match> findMatches(final RiskRule rule, final CharSequence text) {
+        final List<Match> candidates = new ArrayList<>();
+        for (final Pattern pattern : rule.patterns()) {
             collect(pattern, text, candidates);
         }
         candidates.sort(EARLIEST_THEN_LONGEST);
         return firstNonOverlapping(candidates);
     }
 
-    private void collect(Pattern pattern, CharSequence text, List<Match> into) {
-        Matcher matcher = pattern.matcher(text);
+    private void collect(final Pattern pattern, final CharSequence text, final List<Match> into) {
+        final Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             if (matcher.end() > matcher.start()) {
                 into.add(new Match(matcher.start(), clippedEnd(text, matcher.start(), matcher.end())));
@@ -53,16 +53,16 @@ public final class RuleMatcher {
         }
     }
 
-    private int clippedEnd(CharSequence text, int start, int end) {
+    private int clippedEnd(final CharSequence text, final int start, final int end) {
         if (end - start <= maxMatchLength) {
             return end;
         }
         return TextBounds.safeStart(text, start + maxMatchLength);
     }
 
-    private List<Match> firstNonOverlapping(List<Match> sorted) {
-        List<Match> accepted = new ArrayList<>();
-        for (Match candidate : sorted) {
+    private List<Match> firstNonOverlapping(final List<Match> sorted) {
+        final List<Match> accepted = new ArrayList<>();
+        for (final Match candidate : sorted) {
             if (accepted.size() == maxMatchesPerRule) {
                 break;
             }

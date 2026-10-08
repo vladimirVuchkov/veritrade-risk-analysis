@@ -14,8 +14,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ReportNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    ProblemDetail reportNotFound(ReportNotFoundException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    ProblemDetail reportNotFound(final ReportNotFoundException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
         problem.setTitle(NOT_FOUND_TITLE);
         return problem;
     }

@@ -21,7 +21,7 @@ public record ReportView(
         bySeverity = Collections.unmodifiableMap(bySeverity);
     }
 
-    static ReportView of(Report report) {
+    static ReportView of(final Report report) {
         return new ReportView(report, report.orderedFindings(), report.countByCategory(), report.countBySeverity());
     }
 }
