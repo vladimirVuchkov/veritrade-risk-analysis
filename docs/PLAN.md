@@ -421,9 +421,9 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 |---|---|---|
 | 3.1 Independent code review (one agent only reads and writes remarks; does not fix) | list of issues | done: W3-01 to W3-09 |
 | 3.2 Fix the remarks | | done: Wave 3 commit |
-| 3.3 Clean clone: `docker compose up --build` + `smoke.sh` on a fresh checkout | confirmed | open |
-| 3.4 README review against the checklist (section 11) | | open |
-| 3.5 Conversation records ordered; denylist check and secret check (12.2) | records contain only this task | records 01-03 exported and checked; the final orchestrator session is exported last |
+| 3.3 Clean clone: `docker compose up --build` + `smoke.sh` on a fresh checkout | confirmed | done: fresh clone, build also without the layer cache, smoke and chaos 6/6 |
+| 3.4 README review against the checklist (section 11) | | done: section 11 ticked where it can be checked before publishing; final review added `docs/MANUAL-TESTING.md` and two tests for coverage gaps |
+| 3.5 Conversation records ordered; denylist check and secret check (12.2) | records contain only this task | done: records 01-04; 03 re-exported with the end of its session; 04 is the final review session |
 | 3.6 Publish to GitHub and open the link in a logged-out browser | URL for the reply email | open; needs the author's approval to push |
 
 ---
@@ -471,16 +471,16 @@ Acceptance: `docker compose up --build` on a clean machine; `smoke.sh` passes.
 ## 11. Acceptance checklist before sending
 
 - [ ] The repository is public and clones without errors
-- [ ] `docker compose up --build` works from scratch with no manual steps
-- [ ] `scripts/smoke.sh` passes
-- [ ] `scripts/chaos.sh` passes
-- [ ] `mvn verify` is green for all three services
-- [ ] The UI shows a report and a failure (`FAILED`)
-- [ ] README covers section 10
-- [ ] `docs/ai-conversations/` contains the records, only about this task, with no secrets, personal data, or keys (denylist check passes)
+- [x] `docker compose up --build` works from scratch with no manual steps
+- [x] `scripts/smoke.sh` passes
+- [x] `scripts/chaos.sh` passes
+- [x] `mvn verify` is green for all three services
+- [ ] The UI shows a report and a failure (`FAILED`) — checked through the API and the frontend tests; look at it in a browser with `docs/MANUAL-TESTING.md` step 4
+- [x] README covers section 10
+- [x] `docs/ai-conversations/` contains the records, only about this task, with no secrets, personal data, or keys (denylist check passes)
 - [ ] The CI workflow is green (build and compose smoke job)
-- [ ] `docs/ai-process-log.md` is filled in per the template (12.3–12.4) for all waves and agents
-- [ ] README has an "AI tools" section linking to the log and the records
+- [ ] `docs/ai-process-log.md` is filled in per the template (12.3–12.4) for all waves and agents — everything except the author's fields ("My intervention", "Decision", "My contribution", the conclusion)
+- [x] README has an "AI tools" section linking to the log and the records
 - [ ] No unused code, magic numbers, or copied blocks
 - [ ] I can explain every class and every decision
 
@@ -573,9 +573,9 @@ The README "AI tools" section is a short extract of the log (tool -> what it was
 | 1 - Parallel implementation (A-E, G) | done, local | `aa5bd3c` | `mvnw verify`, frontend, Compose, smoke, chaos 6/6 |
 | 2 - Integration (F, G) | done, local | `0201723` | plus E2E 132/132, export tool tests |
 | 3.1-3.2 - Review and fixes (A, B, D, E, G) | done, local | Wave 3 commit | `mvnw verify` 840, frontend 218, export tool 7, E2E 144, smoke, chaos 6/6 |
-| 3.3 - Clean clone | open | | |
-| 3.4 - README against section 11 | open | | |
-| 3.5 - Conversation records | records 01-03 done; final export of the last orchestrator session open | | denylist and secret check |
+| 3.3 - Clean clone | done | | fresh clone: `compose up --build` (also `--no-cache`), smoke, chaos 6/6 |
+| 3.4 - README against section 11 and final review | done, local | final review commit | `mvnw verify` 842, frontend 218, export tool 7, E2E 146; `docs/MANUAL-TESTING.md` checked against a running stack |
+| 3.5 - Conversation records | done, local: 01-04 | records commit | denylist and secret check |
 | 3.6 - Publishing | open; push only after the author's approval | | |
 
 Open items carried forward: a replay tool for parked outbox rows (known limitation, see README); the

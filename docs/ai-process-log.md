@@ -107,21 +107,82 @@ _Entries are collected from the handoff notes in `handoff/`._
   - A substring check of the denylist with `git grep -w` gave false positives inside Cyrillic words, because it treats non-ASCII letters as word boundaries; the check now uses Unicode word boundaries, like the export tool.
   - A parked outbox row leaves its filing `SUBMITTED` and there is no replay tool yet; recorded as a known limitation.
 
+#### [5] 2026-10-08 - Wave 3 (3.3-3.5) - Final review: orchestrator with agents B and F
+- **Goal:** check the whole task before publishing: are all scenarios tested, are all sessions recorded, is everything in the plan marked, and is there a guide for manual testing; then close the gaps.
+- **Tool and model:** Claude Code (Claude Opus 5.5); orchestrator session with a read-only coverage audit subagent, then two subagents in their own worktrees.
+- **Given to the AI:** the plan (sections 1, 2, 8, 11, 15), the handoff notes and the test folders for the audit; for the agents, the gaps the audit found. Raw record: [`ai-conversations/04-orchestrator-final-review.md`](ai-conversations/04-orchestrator-final-review.md) (subagent transcripts included).
+- **Received:**
+  - Coverage audit: every scenario of the plan has a named test, mostly at unit, integration and end-to-end level; gaps: no 2 MB filing through the whole system, the Analysis "third outcome" (`analysis.failed` cannot be published) only as a unit test, no test of the retry backoff, stale test names in a handoff note.
+  - Agent F: `LargeFilingE2E` (2 tests: exactly 2,097,152 bytes, ASCII and multibyte, phrases at the start, the middle and the last bytes all found); handoff note brought up to date.
+  - Agent B: `AnalysisFailedUnpublishableIT` (a real negative confirm for `analysis.failed` sends the filing to the `.dlq` after 3 attempts, the next filing still flows; the backoff between attempts is at least the configured one).
+  - Orchestrator: [`MANUAL-TESTING.md`](MANUAL-TESTING.md), every API step run against a fresh stack, including a `FAILED` filing on the real stack; links from every handoff note to its exact raw record; the missing record line of the Wave 2 documentation session; sections 3-5 of this log; plan sections 8, 11 and 15.
+  - Records: the session of Waves 1-3 had continued after its export (the final commits), so `03` was exported again from the same transcript; this session is `04`.
+- **My intervention:** _to be completed_
+- **Decision:** _to be completed_
+- **Verification:** a fresh clone of `main`: `docker compose up --build` (also with `--no-cache`), `scripts/smoke.sh` passed, `scripts/chaos.sh` six of six; on the merged branch `./mvnw -B verify` green (842 tests: contracts 29, Ingestion 327 + 26 IT, Analysis 286 + 20 IT, Reporting 137 + 17 IT), `node --test frontend/test/` 218/218, export tool 7/7, `./mvnw -B -Pe2e verify -pl e2e-tests -am` 146/146; each new test was shown to fail on broken behaviour.
+- **Problems/lessons:**
+  - The agents' worktrees started from `origin/main` (the Wave 0 skeleton), not from local `main`; both agents noticed and moved to local `main` before working. Unpushed work makes this easy to miss.
+  - A record exported before the end of its session misses the last steps; the final export of a session is made after its last commit.
+
 ## 3. Part of the system -> AI contribution -> my contribution
 
 | Part | AI contribution | My contribution |
 |---|---|---|
-| Contract (`common-contracts`, `docs/contracts`) | | |
-| Ingestion | | |
-| Analysis | | |
-| Reporting | | |
-| Frontend | | |
-| Infrastructure | | |
-| Tests | | |
-| Documentation | | |
+| Contract (`common-contracts`, `docs/contracts`) | Orchestrator (Wave 0): records, enums, topology constants, deterministic event ids, JSON Schemas, OpenAPI, examples, contract test; later decisions on event versioning and text limits | _to be completed_ |
+| Ingestion | Agent A (Waves 1 and 3): REST API, outbox with publisher confirms, status state machine, correlation id filter, parking of poison outbox rows | _to be completed_ |
+| Analysis | Agent B (Waves 1 and 3): YAML rules and loader, rule engine, the two failure paths, whitespace-tolerant matching | _to be completed_ |
+| Reporting | Agent C (Wave 1): idempotent report store, first-terminal-event-wins rule, report API | _to be completed_ |
+| Frontend | Agent D (Waves 1 and 3): UI, polling flow with cancellation, safe highlighting, mock server | _to be completed_ |
+| Infrastructure | Agent E (Waves 1 and 3): Dockerfiles, Compose, nginx, credentials guard, `smoke.sh`, `chaos.sh`, CI | _to be completed_ |
+| Tests | Every agent wrote the tests for its own folder; Agent F (Wave 2) wrote the end-to-end suite; every Wave 3 fix came with a regression test shown to fail on the old code | _to be completed_ |
+| Documentation | Agent G (Waves 1-3): README, `architecture.md`, ADRs; the orchestrator: plan, agent rules, this log, `MANUAL-TESTING.md` | _to be completed_ |
 
 ## 4. Organisation of the parallel work
 
+- **One orchestrator, many agents.** One Claude Code session acted as the orchestrator. It froze the
+  contract in Wave 0, wrote each agent's prompt, merged the branches and ran the full checks. The
+  agents were subagents of that session (14 in Waves 1-3, plus a Docker setup subagent in Wave 0 and
+  the final review agents), each started in its own git worktree and branch.
+- **Two agents at a time.** Wave 1 ran Ingestion, Analysis, Reporting, Frontend, Infrastructure and
+  Documentation in pairs; Wave 2 ran Integration (F) next to Documentation (G); Wave 3 ran the review
+  fixes in pairs.
+- **One folder, one owner** ([`AGENT-RULES.md`](AGENT-RULES.md)). An agent wrote only in its folder
+  and its handoff note. A change elsewhere was reported to the orchestrator, not made.
+- **Conflicts.** Because folders did not overlap, the merges had no textual conflicts. The conflicts
+  were in meaning, and the orchestrator decided them: the `rulesVersion` bump that touched the frozen
+  contract example, the open question of a higher `eventVersion` (each consumer behaved differently),
+  who cuts an over-long failure reason, and code points versus UTF-16 units in the length limits.
+- **Merging.** Each wave was merged into an `integration/waveN` branch, verified there (Maven,
+  frontend, end-to-end, Compose, smoke, chaos), then squashed into one commit on `main`.
+- **Records.** Agents did not edit this log; each wrote an "AI record" at the end of its handoff note,
+  and the orchestrator compiled them here.
+
 ## 5. What worked well with AI, and what did not
 
+**Worked well**
+- Freezing the contract before the parallel work: five agents built against it without waiting for
+  each other, and the contract test caught drift at build time.
+- Requiring every fix to come with a test that fails on the old code. Each agent reverted its change
+  temporarily to prove it.
+- Testing the real stack. The Compose runs and the end-to-end suite found bugs that every unit and
+  integration test missed: the `__TypeId__` header that left filings `SUBMITTED`, the converter on the
+  Analysis listener, code points versus UTF-16 units, and H2 losing commits on a killed container.
+- An independent read-only review agent (Wave 3.1) that only listed findings; the fixes went to the
+  owners of the code.
+- Agents that reported a problem outside their folder instead of working around it (the Spring Boot
+  4.1 retry property, the H2 2.4.240 CHECK-constraint bug).
+
+**Did not work, or needed correction**
+- Version drift: Spring Boot 4.1 dropped `max-attempts` silently, and the managed H2 version had a
+  bug; both needed a human-style check with a minimal reproduction.
+- An agent killed test processes with `pkill`, which could hit other agents on the same machine; the
+  rules now forbid it.
+- The first versions of the denylist check matched substrings and gave false positives (also inside
+  Cyrillic words); it now matches whole words with Unicode word boundaries.
+- The contract left some behaviour open (higher `eventVersion`, text limit units), and the agents
+  made different choices until the orchestrator decided.
+- Some handoff notes went stale after later waves (test names, counts); the final review fixed them.
+
 ## 6. Conclusion
+
+_to be completed_

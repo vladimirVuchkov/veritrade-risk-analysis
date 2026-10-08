@@ -90,7 +90,7 @@
     bean.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-ae089637cde194d76`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-ae089637cde194d76)
 - Asked for: tasks A1-A6 for ingestion-service, following PLAN.md, AGENT-RULES.md and the frozen
   contract, with exhaustive unit, WebMvc and Testcontainers tests and a green verify.
 - Received: the full service (domain, services, REST API with ProblemDetail, outbox publisher with
@@ -184,7 +184,7 @@ Branch `agent/ingestion-w3`, based on `main` at 0201723.
   disabled in place.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a1afc2c613aa540cd`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a1afc2c613aa540cd)
 - Asked for: the Wave 3 review fixes for Ingestion (W3-01 a and b, W3-07, W3-08) and the two contract
   decisions (event versioning, text limits), each with regression tests that fail on the old code.
 - Received: the fixes above, the V2 migration, unit tests, integration tests and E2E tests.

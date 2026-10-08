@@ -57,7 +57,7 @@
   highlighted excerpts. Add `[fail]` to the title to see the failure reason.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-ab89de28fb5b1014c`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-ab89de28fb5b1014c)
 - Asked for: the Wave 1 frontend (D1 to D5) as plain HTML, CSS and ES modules with no build step;
   pure, testable modules for validation, the API client, polling, highlighting and formatting; DOM
   rendering only through text nodes; a dependency-free mock server; full unit tests and end-to-end
@@ -124,7 +124,7 @@
   first is analysing: the progress line only ever shows the filing that was opened last.
 
 ### AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a4ea4300e7506123a`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a4ea4300e7506123a)
 - Asked for: the W3-05 fix with airtight cancellation (generation token or AbortController, in-flight
   requests aborted), CSP readiness with a static test, the switching edge cases, unit tests that fail
   on the old code, and an e2e test with two overlapping flows against the mock.

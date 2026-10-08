@@ -130,6 +130,9 @@ Put `[fail]` in the title to see a `FAILED` filing. See [`frontend/README.md`](f
 
 ## How to run the tests
 
+To check the running system by hand, step by step (the UI, the API, a `FAILED` filing, the
+dead-letter queues, a stopped service), follow [`docs/MANUAL-TESTING.md`](docs/MANUAL-TESTING.md).
+
 ### Java services (unit and integration tests)
 
 Requires Java 21 and a running Docker daemon (Testcontainers starts RabbitMQ).
@@ -142,14 +145,14 @@ Requires Java 21 and a running Docker daemon (Testcontainers starts RabbitMQ).
   RabbitMQ in Testcontainers (`rabbitmq:4.3-management-alpine`), on dynamic ports.
 - Every service also has an ArchUnit test for its layering, and `common-contracts` validates every
   example in `docs/contracts/examples/` against the JSON Schemas.
-- Current count: 840 tests, all green, including the regression tests for the bugs the end-to-end
+- Current count: 842 tests, all green, including the regression tests for the bugs the end-to-end
   suite and the Wave 3 review found:
 
   | Module | Unit tests (Surefire) | Integration tests (Failsafe) |
   |---|---|---|
   | `common-contracts` | 29 | - |
   | `ingestion-service` | 327 | 26 |
-  | `analysis-service` | 286 | 18 |
+  | `analysis-service` | 286 | 20 |
   | `reporting-service` | 137 | 17 |
 
 **colima on macOS:** Testcontainers' Ryuk container cannot mount the colima socket path. Point
@@ -168,7 +171,9 @@ What the integration tests cover, among other things:
   the AMQP client refuses is parked after its attempts while the next filing is still published; a
   broker outage (`rabbitmqctl stop_app`) parks nothing, and both filings arrive in order afterwards;
 - the full Analysis flow, a forced failure with exactly 3 attempts followed by `analysis.failed`,
-  and poison messages that reach the `.dlq` without retries;
+  and poison messages that reach the `.dlq` without retries; when `analysis.failed` itself is refused
+  by the broker, the filing goes to the `.dlq` and the next filing is still analysed; the pause
+  between the attempts grows as configured (exponential backoff);
 - a newer `eventVersion` going to the `.dlq` without retries in Analysis and Ingestion, and an
   `analysis.failed` reason over 1000 UTF-16 units: Analysis cuts it without splitting a surrogate
   pair, Ingestion dead-letters a longer one;
@@ -287,7 +292,7 @@ Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is neede
   -De2e.keepStack=true` reuses a named stack and leaves it running, for debugging.
 - The management credentials come from `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD` in the
   environment (default `veritrade`); export them when `.env` has other values.
-- A full run takes about 4 minutes (144 tests in 14 classes, warm image cache; `ServiceOutageE2E`
+- A full run takes about 4 minutes (146 tests in 15 classes, warm image cache; `ServiceOutageE2E`
   alone takes about 2 minutes). The test classes share one stack and run one after the other; classes
   that stop a service bring it back afterwards.
 
@@ -313,6 +318,7 @@ Compose v2 and Node 22 on the `PATH`; no Testcontainers socket override is neede
 | 18 | Topology: exchanges, queues, DLQs, bindings, arguments, consumers with prefetch 10 | `TopologyE2E` |
 | 19 | Both published ports bound to `127.0.0.1`; the broker logged the default-password warning | `PublishedPortsE2E` |
 | 20 | The demo filing hard-wrapped at 72 columns gives the same rule ids and summary as the unwrapped one | `HardWrappedFilingE2E` |
+| 21 | A filing of exactly 2 MB (ASCII, and Cyrillic with emoji) reaches `COMPLETED`; risk phrases at the start, the middle and the last bytes are all found | `LargeFilingE2E` |
 
 **The frontend against the real stack.** `FrontendFlowE2E` runs
 [`frontend-flow.test.mjs`](e2e-tests/src/test/node/frontend-flow.test.mjs) with `node --test`. It
@@ -349,6 +355,7 @@ python3 -m unittest discover -s scripts/tests
 | [`samples/`](samples/) | sample filing |
 | [`docs/contracts/`](docs/contracts/) | JSON Schemas, examples, OpenAPI, messaging topology |
 | [`docs/decisions/`](docs/decisions/) | architecture decision records |
+| [`docs/MANUAL-TESTING.md`](docs/MANUAL-TESTING.md) | step-by-step manual checks of the running system |
 | [`docs/PLAN.md`](docs/PLAN.md) | the development plan |
 
 ## Decisions and trade-offs

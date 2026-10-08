@@ -13,6 +13,12 @@ public final class Timeouts {
     public static final Duration COMPOSE_COMMAND = Duration.ofMinutes(2);
     /** Submit (or recovery) to a final status or a report. */
     public static final Duration PROCESSING = Duration.ofSeconds(45);
+    /**
+     * Submit to a final status or a report for a filing at the 2 MB content limit: the body crosses nginx,
+     * Ingestion's outbox, the broker and every rule of Analysis. About 2 s on colima; the rest is margin
+     * for a slow CI host.
+     */
+    public static final Duration LARGE_FILING_PROCESSING = Duration.ofSeconds(60);
     /** Success criterion C2: submit to report. */
     public static final Duration REPORT_DEADLINE = Duration.ofSeconds(10);
     /** How long a filing must stay untouched while its consumer is down. */

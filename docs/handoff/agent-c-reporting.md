@@ -38,7 +38,7 @@
 - Manual check: publish `docs/contracts/examples/analysis-completed.json` to `veritrade.events` with routing key `analysis.completed`, then call `curl localhost:8083/api/reports/3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12`.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a34b6091d15eb1d65`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a34b6091d15eb1d65)
 - Asked for: Reporting service tasks C1-C5. That meant the domain and repositories, a listener on one queue with an idempotency guard and the first-terminal-event-wins rule, the report service with summaries, the REST controller per the OpenAPI, and `RabbitConfig` with the exact topology and retry-then-DLQ behaviour. It also meant exhaustive unit, `@WebMvcTest` and Testcontainers integration tests, plus the orchestrator notes on `max-retries`, `MessageConversionException`, code points against UTF-16 units, and durable queues.
 - Received: the implementation and 151 tests described above, in small commits on `agent/reporting`. Found during testing: `SpringApplicationBuilder.properties()` is overridden by `application.yml`; cached test contexts compete for one queue (fixed with a virtual host per test class); RabbitMQ 4 adds `x-queue-type`; Boot's ProblemDetail advice would turn a UUID type mismatch into a 400 (fixed by parsing the id in the controller); a non-void `@RabbitListener` would try to send a reply.
 - Fixed by hand: nothing; H2 was pinned to 2.3.232 in the parent pom by the orchestrator

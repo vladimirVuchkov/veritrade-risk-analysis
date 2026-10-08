@@ -131,7 +131,7 @@
 - RabbitMQ UI: http://localhost:15672 (user and password from `.env`, default `veritrade`/`veritrade`).
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-ad6189fc38afe8617`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-ad6189fc38afe8617)
 - Asked for: Wave 1 infrastructure tasks E1-E7:
   - service and nginx images;
   - RabbitMQ with management UI;
@@ -247,5 +247,5 @@
   `docker compose down -v`.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a931918950f393e97`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a931918950f393e97)
 - Fixed by hand: nothing; the branch merged without conflicts, and the requests above were done by Agent G.

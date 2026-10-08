@@ -106,7 +106,7 @@
   - `TopologyIT`: queues, arguments, exchanges and bindings as seen through the management API.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a7c47f707a3909d37`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a7c47f707a3909d37)
 - Asked for: Wave 1 Agent B, tasks B1 to B5 from `docs/PLAN.md`: the rules YAML, a validating
   `RuleLoader`, a pure rule engine, the listener and publisher with the two failure paths, a
   `RabbitConfig` with exactly the contract topology, an ArchUnit test, and complete unit and Testcontainers
@@ -181,6 +181,42 @@
   against the old behaviour (the change reverted temporarily) and failed.
 
 ### AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a4154d4ad639657f3`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a4154d4ad639657f3)
 - Fixed by hand: the orchestrator bumped `rulesVersion` to `"1.1"` at merge (rules file, contract example,
   `RuleLoaderTest`, `RiskAnalyzerTest`).
+
+## Final review gap: the third failure outcome as an integration test
+
+### Done
+- **`AnalysisFailedUnpublishableIT`** (new, 2 tests). Analysis fails on every attempt, and the broker also
+  refuses `analysis.failed` with a real negative publisher confirm. The only queue bound to `analysis.failed`
+  is full (`x-max-length: 0`, `x-overflow: reject-publish`), so `AnalysisEventPublisher` throws
+  `EventPublishException`, and `FailedAnalysisRecoverer` rejects the message. The capture queue is bound only
+  to `analysis.started` and `analysis.completed` during these tests, and the bindings are restored afterwards.
+  - `deadLettersTheFilingWhenAnalysisFailedIsNackedAndKeepsConsuming`: the original `filing.submitted`
+    (same body) reaches `analysis.filing-submitted.dlq` once (`x-death` reason `rejected`, count 1). The
+    analyzer runs exactly `max-retries + 1` times (3), as configured. `analysis.failed` is published exactly
+    once and reaches no queue. Only the `analysis.started` events of the 3 attempts are delivered, all with
+    the same `eventId`. The next valid filing is then analysed normally (`analysis.started` and
+    `analysis.completed`), and nothing more goes to the dead-letter queue.
+  - `waitsTheConfiguredExponentialBackoffBetweenAttempts`: the pause before retry *n* is at least
+    `initial-interval * multiplier^(n-1)`, capped at `max-interval`. The values are read from the
+    configuration: 100 ms and then 200 ms in the IT context (application.yml multiplier 2, with the IT
+    overrides of the interval). The test checks lower bounds only, so a slow machine cannot make it fail.
+    Until now, tests checked only the number of attempts, not the backoff.
+- No production code changed.
+
+### How to verify
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw -B -q -pl analysis-service -am verify`:
+  green, 286 unit tests and 20 integration tests.
+- Mutation checks (temporary, reverted):
+  - The recoverer acknowledges instead of dead-lettering: both new tests fail (no message on the `.dlq`).
+  - The retry delay is set to 1 ms: the backoff test fails at retry 1 (5 ms < 100 ms).
+  - The multiplier is set to 1: the backoff test fails at retry 2 (110 ms < 200 ms).
+
+### AI record
+- Raw record: [`04-orchestrator-final-review.md`, subagent transcript `agent-a1b5dcbae25110217`](../ai-conversations/04-orchestrator-final-review.md#subagent-transcript-agent-a1b5dcbae25110217)
+- Asked for: an integration test for the third failure outcome (processing fails and `analysis.failed`
+  cannot be published, so the filing goes to the `.dlq`) and, if robust, a test of the retry backoff,
+  each shown to fail on broken behaviour.
+- Received: `AnalysisFailedUnpublishableIT` with the two tests above, and this section.

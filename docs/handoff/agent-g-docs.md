@@ -152,6 +152,14 @@ Branch `agent/docs-w2b`, from `integration/wave2` (Agent F's suite and my Wave 2
   the 663 and 132 counts come from Agent F's handoff and the orchestrator.
 - No placeholders are left in the README.
 
+### AI record
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a72c5084616fc17f7`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a72c5084616fc17f7)
+  (added by the orchestrator in the final review; this session had no record line).
+- Asked for: finish the Wave 2 documentation after the E2E merge: replace the end-to-end placeholder
+  in the README, document the export tool tests and the lessons from the real stack, and update the
+  known limitations, test counts and repository layout.
+- Received: the README changes listed in "After the E2E merge" on `agent/docs-w2b`.
+
 ## Wave 3
 Branch `agent/docs-w3`, from `integration/wave3` (the Wave 3 fixes of Agents A, B, D and E merged).
 Everything was checked against the merged code and configuration; where an agent's handoff note and
@@ -211,7 +219,7 @@ the code differ, the docs follow the code.
   `docs/architecture.md`, `docs/decisions/*.md` and this note: 0 broken links (anchors included).
 
 ### AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-a4e6d63a2b41fd5ab`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-a4e6d63a2b41fd5ab)
 - Asked for: make the README, the architecture document and the ADRs match the merged Wave 3 code,
   with every statement checked against the code, real test counts, ADRs only for real Wave 3
   decisions, and links to the contract rules instead of copies.
@@ -219,7 +227,7 @@ the code differ, the docs follow the code.
 - Fixed by hand: nothing; the orchestrator updated the `rulesVersion` note in the Analysis handoff that this agent reported as stale.
 
 ## AI record
-- Raw record: exported by the orchestrator from its session (subagent transcript)
+- Raw record: [`03-orchestrator-waves-1-3.md`, subagent transcript `agent-adae5bc4b0ac7088c`](../ai-conversations/03-orchestrator-waves-1-3.md#subagent-transcript-agent-adae5bc4b0ac7088c)
 - Asked for: Wave 2 Agent G. That meant the README per PLAN.md section 10, `docs/architecture.md`
   with Mermaid diagrams (components, four sequence diagrams, the status state machine, the outbox,
   the topology table) and ten short ADRs, all written from the actual code. Also a link check, a run
